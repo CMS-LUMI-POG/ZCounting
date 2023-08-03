@@ -4,7 +4,7 @@
 # Set Variables
 #############
 
-pass='rainbowsix'                                                                                        # grid passwd
+pass=''                                                                                        # grid passwd
 cmsswRel='/afs/cern.ch/user/'${USER:0:1}'/'$USER'/work/private/CMSSW_12_4_12/src/'             # path to ZCounting dir.
 PDs=('/Muon0/' '/Muon1/')                                                                      # options for PD
 COREDIR='https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2023/'
