@@ -370,7 +370,7 @@ for fill, data_fill in data.groupby("fill"):
             yErrMC = np.array([f(x).s for x in xMC])
 
             nround = 3
-            slopes[fill] = params[1].n 
+            slopes[fill] = params[0].n 
             
             ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
             ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
