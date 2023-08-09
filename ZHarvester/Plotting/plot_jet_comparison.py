@@ -142,13 +142,17 @@ zrate["z_xsec"] = zrate["z_xsec"] / (zrate["recZCount"].sum() / zrate["recLumi"]
 resource_dir = "/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_12_4_9/src/ZCounting/ZHarvester/res/Run2_Luminosity_studies/Zcounting"
 
 rundict = {
-    275376: "Run2016B",       
+    276831: "Run2016E",
     278820: "Run2016G",
-    294645: "Run2017",          
-    315252: "Run2018",  
-    320394: "Run2018D",  
-    355064: "Run2022",
-    359021: "Run2022D",
+    297020: "Run2017B",          
+    299337: "Run2017C",          
+    302030: "Run2017D",          
+    303435: "Run2017E",          
+    304911: "Run2017F",          
+    315252: "Run2018A",  
+    316998: "Run2018B",  
+    319313: "Run2018C",  
+    320394: "Run2018D",
 }
 
 # combined jetlumi info
@@ -214,9 +218,6 @@ for jet_type in ("jetlum",): # ("jetlum", "jtlum"):
 
                 if sum(sel) <= 0:
                     continue
-                if label == "Run2016B":
-                    continue
-
                 if mode == "lumi":
                     tag = df[~sel]["recLumi"].sum()
                     tag_pos = tag+(rangex[1]-rangex[0])*0.002
