@@ -136,6 +136,9 @@ def load_result(files):
 # ------------------------------------------------------------------------------
 def to_DateTime(time, string_format = "yy/mm/dd"):
 
+    if isinstance(time, float):
+        return datetime.utcfromtimestamp(time)
+
     # converts time string to python datetime
     time = time.split(" ")
 

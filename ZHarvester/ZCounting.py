@@ -8,8 +8,10 @@ import uncertainties as unc
 import datetime
 import numpy as np
 
-from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelation, to_DateTime
+from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelation
+from python import utils
 
+from common.utils import to_DateTime
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -19,55 +21,20 @@ ROOT.gROOT.SetBatch(True)
 
 def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
     log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
-    
-    # helper function to read the workspace for a specific fit
-    def open_workspace(filename):
-        file_result = directory+"/{0}_{1}.root".format(filename, m)
-        
-        if not os.path.isfile(file_result):
-            log.warning(" === No result for `{0}`".format(file_result))
-            return None, None
-        
-        f = ROOT.TFile(file_result,"READ")
-        w = f.Get("workspace")
-        return f, w
-
-    def open_workspace_yield(filename):
-        f, w = open_workspace("workspace_yield_"+filename)
-        
-        # The number of signal events is capped at 0, the error is capped to be at least sqrt(N)
-        Nsig = max(w.var("Nsig").getVal(), 0)
-        Nsig = unc.ufloat(Nsig, max(w.var("Nsig").getError(), np.sqrt(Nsig)))
-        chi2 = w.arg("chi2").getVal()
-        
-        f.Close()
-        f.Delete()
-        w.Delete()
-        return Nsig, chi2
 
     # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
-    NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
-    NsigIDFail, chi2ID = open_workspace_yield("ID_{0}_0".format(etaRegion))
-
-    NsigHLT2 = NsigHLT2
-    NsigHLT1 = NsigHLT1
-    NsigIDFail = NsigIDFail
+    NsigHLT2, NbkgHLT2, chi2HLT2, meanHLT2, sigmaHLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m, signal_parameters=True)
+    NsigHLT1, NbkgHLT1, chi2HLT1, meanHLT1, sigmaHLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m, signal_parameters=True)
+    NsigIDFail, NbkgIDFail, chi2ID, meanIDFail, sigmaIDFail = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m, signal_parameters=True)
 
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    NsigGloPass, chi2GloPass = open_workspace_yield("Glo_{0}_1".format(etaRegion))
-    NsigGloFail, chi2GloFail = open_workspace_yield("Glo_{0}_0".format(etaRegion))
+    NsigGloPass, NbkgGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigGloFail, NbkgGloFail, chi2GloFail, meanGloFail, sigmaGloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m, signal_parameters=True)
 
-    NsigStaPass, chi2StaPass = open_workspace_yield("Sta_{0}_1".format(etaRegion))
-    NsigStaFail, chi2StaFail = open_workspace_yield("Sta_{0}_0".format(etaRegion))
-
-    NsigGloPass = NsigGloPass
-    NsigGloFail = NsigGloFail
-
-    NsigStaPass = NsigStaPass
-    NsigStaFail = NsigStaFail
+    NsigStaPass, NbkgStaPass, chi2StaPass, meanStaPass, sigmaStaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigStaFail, NbkgStaFail, chi2StaFail, meanStaFail, sigmaStaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m, signal_parameters=True)
 
     effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
     effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
@@ -75,22 +42,49 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
     effMu = effID*effGlo*effSta
 
     res = {
-        "chi2HLT2": chi2HLT2,
-        "chi2HLT1": chi2HLT1,
-        "chi2ID": chi2ID,
+        # mean of gaussian signal resolution function
+        "meanHLT2": meanHLT2,
+        "meanHLT1": meanHLT1,
+        "meanIDFail": meanIDFail,
+        "meanGloPass": meanGloPass,
+        "meanGloFail": meanGloFail,
+        "meanStaPass": meanStaPass,
+        "meanStaFail": meanStaFail,
+        # standard deviation of gaussian signal resolution function
+        "sigmaHLT2": sigmaHLT2,
+        "sigmaHLT1": sigmaHLT1,
+        "sigmaIDFail": sigmaIDFail,
+        "sigmaGloPass": sigmaGloPass,
+        "sigmaGloFail": sigmaGloFail,
+        "sigmaStaPass": sigmaStaPass,
+        "sigmaStaFail": sigmaStaFail,
+        # Signal numbers in mutual exclusive categories
+        "NsigHLT2": NsigHLT2,
+        "NsigHLT1": NsigHLT1,
+        "NsigIDFail": NsigIDFail,
         "NsigGloPass": NsigGloPass,
         "NsigGloFail": NsigGloFail,
         "NsigStaPass": NsigStaPass,
         "NsigStaFail": NsigStaFail,
-        "effGlo": effGlo,
-        "effSta": effSta,
+        # Background numbers in mutual exclusive categories
+        "NbkgHLT1": NbkgHLT1,
+        "NbkgHLT2": NbkgHLT2,
+        "NbkgIDFail": NbkgIDFail,
+        "NbkgGloPass": NbkgGloPass,
+        "NbkgGloFail": NbkgGloFail,
+        "NbkgStaPass": NbkgStaPass,
+        "NbkgStaFail": NbkgStaFail,
+        # chi2 from fits
+        "chi2HLT2": chi2HLT2,
+        "chi2HLT1": chi2HLT1,
+        "chi2ID": chi2ID,
         "chi2GloPass": chi2GloPass,
         "chi2GloFail": chi2GloFail,
         "chi2StaPass": chi2StaPass,
         "chi2StaFail": chi2StaFail,
-        "NsigHLT2": NsigHLT2,
-        "NsigHLT1": NsigHLT1,
-        "NsigIDFail": NsigIDFail,
+        # efficiencies
+        "effGlo": effGlo,
+        "effSta": effSta,
         "effHLT": effHLT,
         "effID": effID,
         "effMu": effMu,
@@ -98,7 +92,8 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
         "cIO": cIO,
         "cID": cID,
         "cAcceptance": cAcceptance,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
+        # taking stat uncertainty on ID efficiency into account
+        "recZCount": (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)**2 / (4 * NsigHLT2 *effGlo**2 * effSta**2 )  * cHLT * cID * cIO**2 * cAcceptance
     }
 
     return res
@@ -292,7 +287,7 @@ if __name__ == '__main__':
             log.warning(": directory already exists ...")
 
     ########### Constant settings ##########
-    secPerLS = float(23.3)
+    secPerLS = float(23.31112)
     
     LumiPerMeasurement = args.LumiPerMeasurement  # minimum recorded lumi for one measurement in pb-1
 
@@ -623,13 +618,20 @@ if __name__ == '__main__':
 
                 # convert time string to datetime format
                 beginTime = to_DateTime(df['time'][0], string_format = "mm/dd/yy")
-                endTime = to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
-                
+
+                # endTime from next lumisection in next measurement (if it is there)
+                lsNext = df['ls'][-1] + 1
+                if lsNext in byLS_run['ls'].values:
+                    endTime = to_DateTime( byLS_run[byLS_run['ls'] == lsNext]['time'][-1], string_format = "mm/dd/yy")
+                else:
+                    endTime = to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
+
                 # total time window from the beginning of the first to the end of the last lumisection
                 totaltimewindow = (endTime - beginTime).total_seconds()
 
                 # delivered, efficiency and deadtime corrected, Z boson count
                 delZCount = result["recZCount"] / deadtime * (totaltimewindow / timewindow)
+                ZRate = result["recZCount"] / (timewindow * deadtime)
 
                 result.update({
                     "fill": fill,
@@ -640,8 +642,10 @@ if __name__ == '__main__':
                     "delLumi": delLumi,
                     "recLumi": recLumi,
                     "timewindow": timewindow,
+                    "deadtime": deadtime,
                     "pileUp": df['avgpu'].mean(),
                     "delZCount": delZCount,
+                    "ZRate": ZRate,
                 })
             
                 results.append(result)

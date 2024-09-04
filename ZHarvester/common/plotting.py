@@ -8,22 +8,22 @@ def set_matplotlib_style():
     labelsize =  12.5
 
     plt.rcParams.update({
-        "text.usetex": True,
-        "font.family": "serif",
-        "font.serif": ["Palatino",],
+        # "text.usetex": True,
+        # "font.family": "serif",
+        # "font.serif": ["Palatino",],
         "font.size": textsize,
         'text.latex.preamble': [r"""\usepackage{bm}"""]
     })
 
     mpl.rcParams.update({
-        "legend.fontsize" : "medium",
+        # "legend.fontsize" : "medium",
         "legend.frameon" : False,
         "legend.handletextpad" : 0.1,
         "legend.columnspacing" : 0.8,
-        "axes.labelsize" : "medium",
-        "axes.titlesize" : "medium",
-        "xtick.labelsize" : "medium",
-        "ytick.labelsize" : "medium",
+        # "axes.labelsize" : "medium",
+        # "axes.titlesize" : "medium",
+        # "xtick.labelsize" : "medium",
+        # "ytick.labelsize" : "medium",
         'xtick.direction': 'in',
         'ytick.direction': 'in',
         'xtick.top': True,
