@@ -284,6 +284,7 @@ for fill, data_fill in data.groupby("fill"):
     ax1.text(0.97, 0.6, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
     plt.savefig(outDir+f"/fill{fill}_eff.{fmt}")
+    plotting.write_index_and_log(outDir, f"/fill{fill}_eff", args=args)
     plt.close()    
 
     ### Make plot for lumi vs time
@@ -388,6 +389,7 @@ for fill, data_fill in data.groupby("fill"):
     ax2.yaxis.set_label_coords(-0.138, 0.5)
 
     plt.savefig(outDir+f"/fill{fill}_lumi.{fmt}")
+    plotting.write_index_and_log(outDir, f"/fill{fill}_lumi", args=args)
     plt.close()
 
 
@@ -464,6 +466,7 @@ for fill, data_fill in data.groupby("fill"):
     ax2.yaxis.set_label_coords(-0.138, 0.5)
 
     plt.savefig(outDir+f"/fill{fill}_lumi_pileup.{fmt}")
+    plotting.write_index_and_log(outDir, f"/fill{fill}_lumi_pileup", args=args)
     plt.close()
   
     
@@ -518,7 +521,10 @@ for fill, data_fill in data.groupby("fill"):
 
     plt.savefig(outDir+f"/fill{fill}_eff_pileup.{fmt}")
     plt.close()
- 
+
+    plotting.write_index_and_log(outDir, f"/fill{fill}_eff_pileup", args=args)
+
+
 # Bar plot: fill x slopes
 if not args.noFit:
     fig = plt.figure()
@@ -555,3 +561,4 @@ if not args.noFit:
     axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
     plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
     plt.close()
+
