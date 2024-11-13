@@ -10,6 +10,8 @@ import uncertainties as unc
 import pdb
 from scipy.stats import norm    # for gauss function
 
+import mplhep as hep
+
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
@@ -17,9 +19,9 @@ sys.path.append(os.getcwd())
 print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from python.utils import to_DateTime
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
-from python.utils import to_DateTime
+from common.utils import to_DateTime
+from common import plotting
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
@@ -45,11 +47,11 @@ labelsize = 12.5
 textsize = 15
 
 plt.rcParams.update({
-    "text.usetex": True,
+    # "text.usetex": True,
     "font.family": "serif",
     "font.serif": ["Palatino",],
     "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
+    # 'text.latex.preamble': [r"""\usepackage{bm}"""]
 })
 
 mpl.rcParams.update({
@@ -62,8 +64,8 @@ mpl.rcParams.update({
 
 # --- PHYSICS luminosity
 
-lumi_2016 = 36.33
-lumi_2017 = 38.48 # unprescaled 42.04
+lumi_2016 = 35.9
+lumi_2017 = 38.2 # unprescaled 42.04
 
 # --- uncertainties on PHYSICS luminosity
 include_unc_PHYSICS = run2
@@ -184,18 +186,10 @@ def make_hist(
     sumN=50,    # make averages of sumN measurements
     label="Z luminosity / Ref. luminosity",
     saveas="zcount",
-    title=None,
+    year=None,
     legend='upper right',
     rangey=[0.89,1.11]
 ):
-    if "2022" in title:
-        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
-    else:
-        lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
-
-    if title:
-        lefttitle += " $(\mathrm{"+title+"})$"
-
     saveas = str(sumN) + "_" + saveas
 
     if run_range:
@@ -209,6 +203,9 @@ def make_hist(
     data = data.sort_values(['run','time'])
     
     data['lumiratio'] = data[zLumi_name] / data[refLumi_name]
+
+    lumi_sum = data[refLumi_name].sum()/1000.
+    lumi_sum = round(lumi_sum, 1 if lumi_sum <100 else 0)
 
     # --- sum up each sumN rows
     lumiratio = (data[zLumi_name].groupby(data.index // sumN).sum()) / (data[refLumi_name].groupby(data.index // sumN).sum())
@@ -238,7 +235,7 @@ def make_hist(
     for weighted in (False, True):
         plt.clf()
         fig = plt.figure()
-        fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125)
+        fig.subplots_adjust(left=0.15, right=0.99, top=0.93, bottom=0.125)
         ax = fig.add_subplot(111)
 
         if weighted:
@@ -257,9 +254,12 @@ def make_hist(
 
             
         ax.set_xlabel(label, fontsize=textsize)
-        ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+
+        hep.cms.label(label=args.label, loc=0, ax=ax, data=True, year=year, lumi=lumi_sum)
+
         ax.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)), 
             verticalalignment='top', horizontalalignment="right", transform=ax.transAxes)
+
 
         ax.set_xlim(range)
 
@@ -270,6 +270,8 @@ def make_hist(
 
         plt.savefig(outDir+histname+".png")
         plt.savefig(outDir+histname+".pdf")
+        plotting.write_index_and_log(outDir, histname, args=args)
+
         plt.close()
 
     # --- make scatter
@@ -290,7 +292,7 @@ def make_hist(
             plt.clf()
             fig = plt.figure(figsize=(10.0,4.0))
             ax = fig.add_subplot(111)
-            fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
+            fig.subplots_adjust(left=0.1, right=0.99, top=0.93, bottom=0.15)
 
             # plot uncertinty bar attributed to PHYSICS luminosity
             if suffix1 in ("lumi", ) and include_unc_PHYSICS:
@@ -298,13 +300,13 @@ def make_hist(
                 starts = np.array([rangex[0],])
                 widths = np.array([abs(rangex[1] - rangex[0]),])
 
-                if title and "2016" in title:
+                if year == 2016:
                     heights = np.array([unc_2016*2,])
                     bottoms = np.array([1. - unc_2016,])
-                elif title and "2017" in title:
+                elif year == 2017:
                     heights = np.array([unc_2017*2,])
                     bottoms = np.array([1. - unc_2017,])
-                elif title and "2018" in title:
+                elif year == 2018:
                     heights = np.array([unc_2018*2,])
                     bottoms = np.array([1. - unc_2018,])
                 else:
@@ -337,8 +339,7 @@ def make_hist(
 
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
 
-            ax.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
-
+            hep.cms.label(label=args.label, loc=0, ax=ax, data=True, year=year, lumi=lumi_sum)
 
             ax.set_xlabel(xlabel, fontsize=textsize)
             ax.set_ylabel(ylabel, fontsize=textsize)
@@ -415,33 +416,37 @@ def make_hist(
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".png")
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".pdf")
             plt.close()
+            plotting.write_index_and_log(outDir, "/scatter_"+suffix+"_"+suffix1+"_"+saveas, args=args)
+
 
 # make_hist(data, run_range=(297046,306462),
 #     # label="$\mathcal{L}_\mathrm{Z} / \mathcal{L}_\mathrm{C}$", 
 #     label="Z luminosity / Ref. luminosity", 
 #     saveas="2017_zcountI", title="2017",rangey=[0.89,1.11])
  
-#make_hist(data, saveas="zcount", title="Run\ II")
+# make_hist(data, saveas="zcount", year=None)
 # make_hist(data, label="ZCount(BB) / PHYSICS", saveas="zcountBB")
 # make_hist(data, label="ZCount(BE) / PHYSICS", saveas="zcountBE")
 # make_hist(data, label="ZCount(EE) / PHYSICS", saveas="zcountEE")
 # # make_hist(data, label="ZCount(I) / PHYSICS", saveas="zcountI")
 
-make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
-make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", title="2016\ pre\ VFP",rangey=[0.92,1.08])
-make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", title="2016\ post\ VFP",rangey=[0.92,1.08])
+# make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
+# make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", year=2016, rangey=[0.92,1.08])
+# make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", year=2016, rangey=[0.92,1.08])
 
-# make_hist(data, run_range=(297046,299329), saveas="2017B_zcount", title="2017 B")#,rangey=[0.85,1.15])
-# make_hist(data, run_range=(303434,304797), saveas="2017E_zcount", title="2017 E")#,rangey=[0.85,1.15])
-# make_hist(data, run_range=(305040,306462), saveas="2017F_zcount", title="2017 F")#,rangey=[0.85,1.15])
+make_hist(data, run_range=(297020,299329), saveas="2017B_zcount", year=2017)#,rangey=[0.85,1.15])
+make_hist(data, run_range=(299337,302029), saveas="2017C_zcount", year=2017)#,rangey=[0.85,1.15])
+make_hist(data, run_range=(302030,303434), saveas="2017D_zcount", year=2017)#,rangey=[0.85,1.15])
+make_hist(data, run_range=(303435,304826), saveas="2017E_zcount", year=2017)#,rangey=[0.85,1.15])
+make_hist(data, run_range=(304911,306462), saveas="2017F_zcount", year=2017)#,rangey=[0.85,1.15])
 
-make_hist(data, run_range=(297046,306462), saveas="2017_zcount", title="2017",  legend="lower right",rangey=[0.92,1.08])#)
+# make_hist(data, run_range=(297046,306462), saveas="2017_zcount", year=2017,  legend="lower right",rangey=[0.92,1.08])#)
 # make_hist(data, run_range=(297046,306462), label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2017")#,rangey=[0.85,1.15])
 # 
-make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
+# make_hist(data, run_range=(315252,325175), saveas="2018_zcount", year=2018,rangey=[0.92,1.08])
 
 # make_hist(data, saveas="zcount", year="2022")
 

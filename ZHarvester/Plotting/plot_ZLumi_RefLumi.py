@@ -227,7 +227,7 @@ for fill, data_fill in data.groupby("fill"):
 
 
     yRef = data_fill['dLRec(/nb)'].values
-    yRef_lumi_per_fill[fill] = yRef.sum()
+    yRef_lumi_per_fill[fill] = data_fill["recLumi"].sum()
 
     ### Make plot for efficiency vs time
     plt.clf()
