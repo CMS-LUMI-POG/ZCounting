@@ -1209,12 +1209,12 @@ void getZyield(
         m.setRange("rangeCenter", 76, 104);
     }
     
-    RooRealVar Nsig("Nsig","sigYield", NsigInit, 0., 1.5*NsigMax);
-    RooRealVar Nbkg("Nbkg","bkgYield", NbkgInit, 0., NsigMax);
+    RooRealVar Nsig("Nsig", "Number of signal candidates", NsigInit, -0.25*NsigMax, 1.5*NsigMax);
+    RooRealVar Nbkg("Nbkg", "Number of background candidates", NbkgInit, -0.25*NsigMax, 1.5*NsigMax);
     RooAddPdf modelPdf("totalPdf","Z sig+bkg",
         RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
 
-    RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
+    // RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
 
     TFile *fFit = new TFile(Form(
         "%s/workspace_yield_%s_%s_%i_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion, iBin),
@@ -1222,7 +1222,7 @@ void getZyield(
 
     // save all information in RooWorkspace
     RooWorkspace* w = new RooWorkspace("workspace","Workspace");
-    w->import(purity);
+    // w->import(purity);
     w->import(*data);
     w->import(modelPdf);
 

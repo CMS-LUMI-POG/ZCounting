@@ -88,7 +88,7 @@ def parser_plot(pars=None):
     if pars is None:
         pars = parser()   # initialize default parser
 
-    pars.add_argument("--label",  default='Work in progress',  type=str, help="specify CMS label ('Work in progress', 'Preliminary', )")
+    pars.add_argument("--label",  default='Preliminary',  type=str, help="specify CMS label ('Work in progress', 'Preliminary', )")
 
     return pars
 

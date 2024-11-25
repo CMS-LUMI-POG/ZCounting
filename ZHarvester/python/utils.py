@@ -1,3 +1,11 @@
+import os
+import ROOT
+import uncertainties as unc
+import numpy as np
+
+from common.logging import child_logger
+log = child_logger(__name__)
+
 
 # ------------------------------------------------------------------------------
 def load_input_csv(byLS_data):
@@ -30,6 +38,8 @@ def load_input_csv(byLS_data):
         byLS_data['recorded(/fb)'] = byLS_data['recorded(/fb)'].apply(lambda x: x * 1000.)
         byLS_data = byLS_data.rename(index=str, columns={'delivered(/fb)': 'delivered(/pb)', 'recorded(/fb)': 'recorded(/pb)'})
 
+    byLS_data['recorded(/pb)'] = byLS_data['recorded(/pb)'].fillna(0)
+
     # if there are multiple entries of the same ls (for example from different triggers), 
     #   only keep the one with the highest luminosity.
     byLS_data = byLS_data.sort_values(['fill', 'run', 'ls', 'delivered(/pb)', 'recorded(/pb)'])
@@ -38,25 +48,11 @@ def load_input_csv(byLS_data):
     return byLS_data
 
 # ------------------------------------------------------------------------------
-def to_DateTime(time, string_format = "yy/mm/dd"):
-
-    # converts time string to python datetime
-    from datetime import datetime
-    time = time.split(" ")
-
-    if string_format == "yy/mm/dd":     # format agreed upon ATLAS and CMS
-        year, month, day = [int(x) for x in time[0].split("/")]
-        year += 2000
-        hour, min, sec   = [int(x) for x in time[1].split(":")]
-    elif string_format == "mm/dd/yy":   # brilcalc format
-        month, day, year = [int(x) for x in time[0].split("/")]
-        year += 2000
-        hour, min, sec   = [int(x) for x in time[1].split(":")]
-    else:   # default format
-        year, month, day = [int(x) for x in time[0].split("-")]
-        hour, min, sec   = [int(float(x)) for x in time[1].split(":")]
-    
-    return datetime(year, month, day, hour, min, sec)
+def unorm(value):
+    if value > 0:
+        return unc.ufloat(value, np.sqrt(value))
+    else: 
+        return unc.ufloat(0.0, 0.0)
 
 # ------------------------------------------------------------------------------
 def getFileName(directory, run):
@@ -183,9 +179,7 @@ def get_ls_for_next_measurement(
     threshold : float, optional
         If the luminosity in one lumisection is above this value and the number z counts is zero, the ls is skipped 
     """
-    
-    
-    
+        
     if luminosities:
         # make measurement based on number of lumisections
         if len(lumisections) != len(luminosities):
@@ -415,6 +409,64 @@ def getEra(run):
         return "Run2022D"
 
     return "Run2022" #default 
+
+def open_workspace(directory, filename, m):
+    # loading root workspace
+    file_result = f"{directory}/{filename}_{m}.root"
+
+    if not os.path.isfile(file_result):
+        log.warning("No result for `{0}`".format(file_result))
+        return None, None
+
+    f = ROOT.TFile(file_result,"READ")
+    w = f.Get("workspace")
+    return f, w
+
+def open_workspace_yield(directory, filename, m, signal_parameters=False):
+    # reading fit result from root workspace
+    #   if signal_parameters is true, return the mean and standard deviation of the resolution function
+
+    f, w = open_workspace(directory, "workspace_yield_"+filename, m)
+
+    r = f.Get("fitResult")
+
+    # yields are allwed to be negative to obtain reasonable errors, but we cap them here
+    if r.covQual() == 3:
+        def cap(s):
+            va = w.var(s).getVal()
+            vs = w.var(s).getError()
+
+            if va < 0:
+                return unc.ufloat(0, max(0, vs+va))
+            else:
+                return unc.ufloat(va, vs)
+        Nsig = cap("Nsig")
+        Nbkg = cap("Nbkg")
+    else:
+        log.warning(f"Covariance matrix has status {r.covQual()} and no relyable uncertainties! Use sqrt(N) instead")
+        Nsig = unorm(max(0, w.var("Nsig").getVal()))
+        Nbkg = unorm(max(0, w.var("Nbkg").getVal()))
+
+    chi2 = w.arg("chi2").getVal()
+
+    if signal_parameters:
+        mean = None
+        sigma = None
+        for p in w.allVars():
+
+            if p.GetName().startswith("sig_mean"):
+                mean = p.getVal()
+            if p.GetName().startswith("sig_sigma"):
+                sigma = p.getVal()
+
+            if mean is not None and sigma is not None:
+                break
+
+    f.Close()
+    f.Delete()
+    w.Delete()
+    return Nsig, Nbkg, chi2, mean, sigma
+
 
 # ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):
