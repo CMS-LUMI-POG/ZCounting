@@ -147,7 +147,7 @@ invalid_runs = {
 }
 
 # quick study for invalid runs
-if False:
+if True:
     lumi=0
     lumi_diff=0
 
@@ -430,15 +430,15 @@ def make_hist(
 # make_hist(data, label="ZCount(EE) / PHYSICS", saveas="zcountEE")
 # # make_hist(data, label="ZCount(I) / PHYSICS", saveas="zcountI")
 
-# make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
+make_hist(data, run_range=(272007,294645), saveas="2016_zcount", year=2016,rangey=[0.92,1.08])#, rangey=[0.7,1.08])
 # make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", year=2016, rangey=[0.92,1.08])
 # make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", year=2016, rangey=[0.92,1.08])
 
-make_hist(data, run_range=(297020,299329), saveas="2017B_zcount", year=2017)#,rangey=[0.85,1.15])
-make_hist(data, run_range=(299337,302029), saveas="2017C_zcount", year=2017)#,rangey=[0.85,1.15])
-make_hist(data, run_range=(302030,303434), saveas="2017D_zcount", year=2017)#,rangey=[0.85,1.15])
-make_hist(data, run_range=(303435,304826), saveas="2017E_zcount", year=2017)#,rangey=[0.85,1.15])
-make_hist(data, run_range=(304911,306462), saveas="2017F_zcount", year=2017)#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297020,299329), saveas="2017B_zcount", year=2017)#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(299337,302029), saveas="2017C_zcount", year=2017)#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(302030,303434), saveas="2017D_zcount", year=2017)#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(303435,304826), saveas="2017E_zcount", year=2017)#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(304911,306462), saveas="2017F_zcount", year=2017)#,rangey=[0.85,1.15])
 
 # make_hist(data, run_range=(297046,306462), saveas="2017_zcount", year=2017,  legend="lower right",rangey=[0.92,1.08])#)
 # make_hist(data, run_range=(297046,306462), label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])

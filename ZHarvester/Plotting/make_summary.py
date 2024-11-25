@@ -70,6 +70,8 @@ if args.xnominal:
     cID = nominal['cID']
     cIO = nominal['cIO']
     cAcceptance = nominal['cAcceptance']
+    import pdb
+    pdb.set_trace()
 
     nominal['NsigHLT2'] = nominal['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
     nominal['NsigHLT1'] = nominal['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
@@ -224,6 +226,7 @@ print("apply prefire corrections - done")
 info = {}
 
 for lo, hi, era in (
+    (272007, 284045, "2016"),
     (272007, 278769, "2016preVFP"),
     (278769, 284045, "2016postVFP"),
     (278769, 280919, "2016G"),
@@ -254,8 +257,6 @@ for lo, hi, era in (
     if args.xnominal:
         info[era]['recZCount_altBkgPass']  = sum(data.loc[loc,'recZCount_altBkgPass'])
         info[era]['recZCount_altBkgFail']  = sum(data.loc[loc,'recZCount_altBkgFail'])
-
-
 
     for var in prefire_variations_Muon:
         info[era]["prefMuon_"+var] = sum(data.loc[loc,'recZCount_prefMuon_{0}'.format(var)])

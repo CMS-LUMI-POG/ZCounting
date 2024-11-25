@@ -19,6 +19,7 @@ with open(args.input, "r") as file_info:
 
 # labels for table header
 labels = [{
+    "2016": r"$\delta\NZ_{\mathrm{2016}}$",
     "2016preVFP": r"$\delta\NZ_{\mathrm{2016 preVFP}}$",
     "2016postVFP": r"$\delta\NZ_{\mathrm{2016 postVFP}}$",
     "2016H": r"$\delta\NZ_{\mathrm{2016 H}}$",
@@ -27,6 +28,7 @@ labels = [{
     "2018": r"$\delta\NZ_{\mathrm{2018}}$"
 },
 {
+    "2016": r"$\delta \frac{\NZ_\mathrm{2016}}{\NZ_\lowPU}$ }",
     "2016preVFP": r"$\delta \frac{\NZ_\mathrm{2016 preVFP}}{\NZ_\lowPU}$ }",
     "2016postVFP": r"$\delta \frac{\NZ_\mathrm{2016 postVFP}}{\NZ_\lowPU}$ }",
     "2016H": r"$\delta \frac{\NZ_\mathrm{2016 H}}{\NZ_\lowPU}$ }",
@@ -101,10 +103,10 @@ for factor in (0, 1):
     info_binWidthDown = load(f"/{prefix}_binWidth025/")
 
     # sortdict = {"2016preVFP":1, "2016postVFP":2, "2016H":3, "2017":4, "2017H":5, "2018":6}
-    sortdict = {"2016preVFP":1, "2016postVFP":2, "2017":4, "2017H":5, "2018":6}
-    
-    items = filter(lambda x: x[0] in sortdict.keys(), info.items())
+    # sortdict = {"2016preVFP":1, "2016postVFP":2, "2017":4, "2017H":5, "2018":6}
+    sortdict = {"2016":1, "2017":4, "2017H":5, "2018":6}
 
+    items = filter(lambda x: x[0] in sortdict.keys(), info.items())
 
     # for alternative signal - only take the effect on the efficiency
     for key, iEra in sorted(items, key=lambda item: sortdict[item[0]]):

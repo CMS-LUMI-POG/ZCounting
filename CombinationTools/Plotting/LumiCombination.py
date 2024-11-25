@@ -5,6 +5,8 @@ import numpy as np
 import uncertainties as unc
 import argparse
 
+import mplhep as hep
+
 parser = argparse.ArgumentParser()
 
 # parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
@@ -22,11 +24,11 @@ if not os.path.isdir(outDir):
 textsize = 15
 
 plt.rcParams.update({
-    "text.usetex": True,
+    # "text.usetex": True,
     "font.family": "serif",
     "font.serif": ["Palatino",],
     "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
+    # 'text.latex.preamble': [r"""\usepackage{bm}"""]
 })
 
 mpl.rcParams.update({
@@ -39,17 +41,17 @@ mpl.rcParams.update({
 
 blind = False
 
-# # full 2016
-# lPHYS = np.array([36.310, 41.480, 59.830])
-# lPHYS_Unc = np.array([0.424, 0.962, 1.501])
+# full 2016
+lPHYS = np.array([36.310, 41.480, 59.830])
+lPHYS_Unc = np.array([0.440, 0.400, 0.522])
 # only postVFP 2016
-lPHYS = np.array([16.81, 41.480, 59.830])
-lPHYS_Unc = np.array([0.196, 0.962, 1.501])
+# lPHYS = np.array([16.81, 41.480, 59.830])
+# lPHYS_Unc = np.array([0.204, 0.400, 0.522])
 
 cPHYS =  np.array([
-    [1.00,0.20,0.41],
-    [0.20,1.00,0.33],
-    [0.41,0.33,1.00]
+    [1.00,0.12,0.15],
+    [0.12,1.00,0.59],
+    [0.15,0.59,1.00]
 ])
 
 uPHYS = unc.correlated_values_norm(list(zip(lPHYS, lPHYS_Unc)), cPHYS)
@@ -83,39 +85,39 @@ hasZ = [1,1,1,1]
 
 if blind:
     lZ = lPHYS
-    lZ_Unc = np.array([0.308,0.767,1.078])
+    lZ_Unc = np.array([0.421, 0.445, 0.638])
 else:
-    lZ = np.array([0.979, 1.004, 0.981]) * lPHYS
-    lZ_Unc = np.array([0.314,0.780,1.100])
+    lZ = np.array([0.978, 0.995, 0.985]) * lPHYS
+    lZ_Unc = np.array([0.421, 0.445, 0.638])
 
 
 cZ =  np.array([
-    [1.00,0.98,0.98],
-    [0.98,1.00,0.99],
-    [0.98,0.99,1.00]
+    [1.00,0.90,0.91],
+    [0.90,1.00,0.98],
+    [0.91,0.98,1.00]
 ])
 
 uZ = unc.correlated_values_norm(list(zip(lZ, lZ_Unc)), cZ)
 
 if blind:
     lComb = lPHYS
-    lComb_Unc = np.array([0.182,0.452,0.653])
+    lComb_Unc = np.array([0.280,0.300,0.425])
 else:
-    lComb = np.array([16.724, 42.291, 59.608])
-    lComb_Unc = np.array([0.182,0.477,0.672])
+    lComb = np.array([35.995, 41.761, 59.657])
+    lComb_Unc = np.array([0.280,0.300,0.425])
 
 cComb =  np.array([
-    [1.00,0.94,0.94],
-    [0.94,1.00,0.98],
-    [0.94,0.98,1.00]
+    [1.00,0.80,0.81],
+    [0.80,1.00,0.96],
+    [0.81,0.96,1.00]
 ])
 
 uComb = unc.correlated_values_norm(list(zip(lComb, lComb_Unc)), cComb)
 
 # chi2 value and probability
-chiQua = 1.423
+chiQua = 2.904
 nDof =  3 
-chiQuaProbability = 70.02 
+chiQuaProbability = 40.66
 
 textsize=15
 offset_top = 0.9
@@ -160,17 +162,21 @@ ax[3].errorbar(xx, yy, xerr=xxErr, yerr=yyErr, fmt='.k', ms=8, capsize=3)
 
 
 
-ax[0].text(0.075, offset_top - 0.075, '2016 postVFP', color='black', transform=ax[0].transAxes, fontsize=textsize)
+ax[0].text(0.075, offset_top - 0.075, '2016', color='black', transform=ax[0].transAxes, fontsize=textsize)
 ax[1].text(0.075, offset_top - 0.075, '2017', color='black', transform=ax[1].transAxes, fontsize=textsize)
 ax[2].text(0.075, offset_top - 0.075, '2018', color='black', transform=ax[2].transAxes, fontsize=textsize)
 ax[3].text(0.075, offset_top - 0.075, 'Run 2', color='black', transform=ax[3].transAxes, fontsize=textsize)
 # ax[3].text(offset_right - 0.2, offset_top, 'CMS', color='black', transform=ax[3].transAxes, fontsize=textsize*1.5, weight='bold')
 
-plt.text(offset_left, offset_top, "$\\chi^2$/ndf = "+str(round(chiQua,3))+"/"+str(nDof)+"\ ;\ $p$ = "+str(round(chiQuaProbability,3))+"\\%", 
+plt.text(offset_left+0.3, offset_top, "$\\chi^2$/ndf = "+str(round(chiQua,3))+"/"+str(nDof)+" $(p = "+str(round(chiQuaProbability,3))+"\\%)$", 
     verticalalignment='bottom', color='black', transform=plt.gcf().transFigure, fontsize=textsize)
 # ax[3].text(offset_right - 0.3, offset_top, "\\bf{CMS}", verticalalignment='top', horizontalalignment='right', transform=ax.transAxes, weight="bold")
-plt.text(offset_right, offset_top, "{\\bf{"+"CMS"+"}} {\\emph{"+args.label+"}}", 
-    verticalalignment='bottom', horizontalalignment='right', transform=plt.gcf().transFigure)
+# plt.text(offset_right, offset_top, "{\\bf{"+"CMS"+"}} {\\emph{"+args.label+"}}", 
+#     verticalalignment='bottom', horizontalalignment='right', transform=plt.gcf().transFigure)
+
+hep.cms.label(label=args.label, loc=0, ax=ax[0], data=True, year=None, lumi=None, rlabel="")
+plt.text(offset_right, offset_top, "$(13\,$TeV)", 
+    verticalalignment='bottom', horizontalalignment="right", color='black', transform=plt.gcf().transFigure, fontsize=textsize)
 
 
 ax[0].set_ylim(0.5, 4.)
