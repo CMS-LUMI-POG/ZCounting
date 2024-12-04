@@ -15,6 +15,33 @@ import matplotlib as mpl
 
 import pdb
 
+
+def weighted_mean_std(values, weights):
+    """
+    Compute the weighted mean and weighted standard deviation of a sample.
+    
+    Parameters:
+    values (array-like): The data points.
+    weights (array-like): The weights associated with each data point.
+    
+    Returns:
+    tuple: (weighted_mean, weighted_standard_deviation)
+    """
+    # Convert inputs to numpy arrays
+    values = np.array(values)
+    weights = np.array(weights)
+    
+    # Calculate the weighted mean
+    weighted_mean = np.sum(weights * values) / np.sum(weights)
+    
+    # Calculate the weighted variance
+    weighted_variance = np.sum(weights * (values - weighted_mean)**2) / np.sum(weights)
+    
+    # Calculate the weighted standard deviation
+    weighted_std = np.sqrt(weighted_variance)
+    
+    return weighted_mean, weighted_std
+
 # ------------------------------------------------------------------------------
 def make_byLS_csv(run_begin, run_end, output_directory, datatag=None, filename_lumimask=None, filename_normtag="normtag_BRIL.json"):
     """

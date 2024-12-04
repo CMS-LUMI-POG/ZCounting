@@ -20,7 +20,7 @@ from common.utils import to_DateTime, load_input_csv
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
-from common import parsing, plotting, logging
+from common import parsing, plotting, logging, utils
 
 from ZUtils.python.utils import linear, pol2
 from scipy.optimize import curve_fit
@@ -31,9 +31,14 @@ parser.add_argument("-r", "--rates", required=True, type=str, help="csv file wit
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale. Or number for cross section in pb to be used")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
+parser.add_argument("--begin", type=int, default=-1, help="specify a fill to start with")
+parser.add_argument("--end", type=int, default=-1, help="specify a fill to end with")
+parser.add_argument("--postfix", type=str, default=None, help="specify a postfix for the file name of the slopes fits")
+
 parser.add_argument("--year", default=2017, type=int, help="Specify year for labeling")
 parser.add_argument("--rrange", nargs=2,  type=float, default=[0.961,1.039], help="Specify range in ratio plot")
 parser.add_argument("--noFit", action="store_true", default=False, help="Don't do a fit")
+parser.add_argument("--plots", nargs="*",  type=str, default=["time", "pileup", "eff"], help="specify a single fill to plot")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
@@ -154,6 +159,12 @@ for key in ('effHLT', 'effID', 'effGlo', 'effSta'):
 do_ratio=True ## activate the ratio plots 
 
 for fill, data_fill in data.groupby("fill"):
+
+    if int(fill) < args.begin:
+        continue
+    if int(fill) > args.end:
+        continue
+
     log.info(f"Now at fill {fill}")
 
     if int(fill) >= 8496:
@@ -225,85 +236,8 @@ for fill, data_fill in data.groupby("fill"):
         
     xTicksPU = np.arange(0, int(xMaxPU)+ticksteps, ticksteps)
 
-
     yRef = data_fill['dLRec(/nb)'].values
     yRef_lumi_per_fill[fill] = data_fill["recLumi"].sum()
-
-    ### Make plot for efficiency vs time
-    plt.clf()
-    fig = plt.figure()
-    
-    ax1 = fig.add_subplot(111)
-    
-    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
-
-    ax1.set_xlabel(xlabel)
-    ax1.set_ylabel(ylabelEff)
-        
-    maxY = 0
-    minY = 1
-    for eff, name, col, mkr, ms in (
-        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
-        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
-        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
-        ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
-    ):
-        
-        y = np.array([y.n for y in data_fill[eff].values])
-        yErr = np.array([y.s for y in data_fill[eff].values])
-        
-        # sort out zeros
-        mask = y>0
-        yErr = yErr[mask]
-        y = y[mask]
-
-        ax1.errorbar(x[mask], y, xerr=(xDown[mask], xUp[mask]), yerr=yErr, 
-            label=name,
-            marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
-            zorder=1)
-
-        # ax1.plot(x, y, label=name,
-        #     marker="o", linewidth=0, color=col, markersize=markersize)
-
-        # yMax = [y.n + y.s for y in data_fill[eff].values]
-        # yMin = [y.n - y.s for y in data_fill[eff].values]
-                    
-        maxY = max(maxY, max(y + yErr))
-        minY = min(minY, min(y - yErr))
-
-    leg = ax1.legend(loc="lower left", ncol=4)
-    
-    yRange = maxY - minY
-    ax1.set_ylim([minY-yRange*0.25, 1.01])
-    ax1.set_xlim([xMin, xMax])
-    ax1.set_xticks(xTicks)
-
-    ax1.set_xticks(xTicks)
-
-    hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
-    ax1.text(0.97, 0.6, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
-
-    plt.savefig(outDir+f"/fill{fill}_eff.{fmt}")
-    plotting.write_index_and_log(outDir, f"/fill{fill}_eff", args=args)
-    plt.close()    
-
-    ### Make plot for lumi vs time
-    plt.clf()
-    fig = plt.figure()
-    if do_ratio:
-        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
-        ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1])
-    else:
-        ax1 = fig.add_subplot(111)
-        
-    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
-        
-    ax1.set_xlabel(xlabel)
-    ax1.set_ylabel(ylabelLumi)
-
-    hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
-    ax1.text(0.97, 0.97, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
     if args.xsec == "":
         # normalize Z luminosity to reference luminosity    
@@ -313,252 +247,387 @@ for fill, data_fill in data.groupby("fill"):
         data_fill['zLumiInst_mc'] *= data_fill['recLumi'].sum() / data_fill['zLumi_mc'].sum()
         data_fill['zLumi_mc'] *= data_fill['recLumi'].sum() / data_fill['zLumi_mc'].sum()
 
-    y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
-    yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
-    
-    ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Ref. luminosity", color="red", 
-        linestyle='', zorder=0)
+    if "time" in args.plots:
+    ### Make plot for lumi vs time
+        plt.clf()
+        fig = plt.figure()
+        if do_ratio:
+            gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
+            ax1 = plt.subplot(gs[0])
+            ax2 = plt.subplot(gs[1])
+        else:
+            ax1 = fig.add_subplot(111)
+            
+        fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
+            
+        ax1.set_xlabel(xlabel)
+        ax1.set_ylabel(ylabelLumi)
 
-    if extLumi:
-        ax1.errorbar(x, yRefExt, xerr=(xDown, xUp), label="RAMSES", color="red", linestyle='',
-            zorder=0)
+        hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
+        ax1.text(0.97, 0.97, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
-    ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
-        label="Z boson rate",# measurement",
-        fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-        zorder=1)
-
-    leg = ax1.legend(loc="lower left", ncol=2)
-
-    yMin = min(min(y),min(yRef))
-    yMax = max(max(y),max(yRef))
-
-    yRange = yMax - yMin 
-    ax1.set_ylim([yMin - yRange*0.45, yMax + yRange*0.15])
-    ax1.set_xlim([xMin, xMax])
-    
-    ax1.set_xticks(xTicks)
-
-    if do_ratio:
-        ax1.set(xticklabels=[])
-
-        ratios = []
-        for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
-            ratios.append(zlumi/lumi)
-
-        yRatio = np.array([yy.n for yy in ratios])
-        yRatioErr = np.array([y.s for y in ratios])
-    
-        ax2.set_xlabel(xlabel)
-        ax2.set_ylabel("Ratio")
+        y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
+        yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
         
-        ax2.errorbar(x, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
-            label="Z rate measurement",
+        ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Ref. luminosity", color="red", 
+            linestyle='', zorder=0)
+
+        if extLumi:
+            ax1.errorbar(x, yRefExt, xerr=(xDown, xUp), label="RAMSES", color="red", linestyle='',
+                zorder=0)
+
+        ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
+            label="Z boson rate",# measurement",
             fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
+
+        leg = ax1.legend(loc="lower left", ncol=2)
+
+        yMin = min(min(y),min(yRef))
+        yMax = max(max(y),max(yRef))
+
+        yRange = yMax - yMin 
+        ax1.set_ylim([yMin - yRange*0.45, yMax + yRange*0.15])
+        ax1.set_xlim([xMin, xMax])
+        
+        ax1.set_xticks(xTicks)
+
+        if do_ratio:
+            ax1.set(xticklabels=[])
+
+            ratios = []
+            for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
+                ratios.append(zlumi/lumi)
+
+            yRatio = np.array([yy.n for yy in ratios])
+            yRatioErr = np.array([y.s for y in ratios])
+        
+            ax2.set_xlabel(xlabel)
+            ax2.set_ylabel("Ratio")
             
-        ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
-       
-        if not args.noFit:
-            log.info("Make fit")
-            
-            func = linear
-            popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
-            perr = np.sqrt(np.diag(pcov))
-            params = unc.correlated_values(popt, pcov)
-            log.info(params)     
+            ax2.errorbar(x, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
+                label="Z rate measurement",
+                fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+                zorder=1)
+                
+            ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
+        
+            if not args.noFit:
+                log.info("Make fit")
+                
+                func = linear
+                popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
+                perr = np.sqrt(np.diag(pcov))
+                params = unc.correlated_values(popt, pcov)
+                log.info(params)     
 
-            f = lambda x: func(x, *params)
-            xMC = np.arange(0,100,0.5)
-            yMC = np.array([f(x).n for x in xMC])
-            yErrMC = np.array([f(x).s for x in xMC])
+                f = lambda x: func(x, *params)
+                xMC = np.arange(0,100,0.5)
+                yMC = np.array([f(x).n for x in xMC])
+                yErrMC = np.array([f(x).s for x in xMC])
 
-            nround = 3
-            slopes[fill] = params[0].n 
-            
-            ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
-            ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
+                nround = 3
+                slopes[fill] = params[0].n 
+                
+                ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
+                ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
 
-        ax2.set_ylim(args.rrange)
-        ax2.set_xlim([xMin, xMax])
-        ax2.set_xticks(xTicks)
-        # leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
+            ax2.set_ylim(args.rrange)
+            ax2.set_xlim([xMin, xMax])
+            ax2.set_xticks(xTicks)
+            # leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
 
-    # align y labels
-    ax1.yaxis.set_label_coords(-0.125, 0.5)
-    ax2.yaxis.set_label_coords(-0.138, 0.5)
+        # align y labels
+        ax1.yaxis.set_label_coords(-0.125, 0.5)
+        ax2.yaxis.set_label_coords(-0.138, 0.5)
 
-    plt.savefig(outDir+f"/fill{fill}_lumi.{fmt}")
-    plotting.write_index_and_log(outDir, f"/fill{fill}_lumi", args=args)
-    plt.close()
+        plt.savefig(outDir+f"/fill{fill}_lumi.png")
+        plt.savefig(outDir+f"/fill{fill}_lumi.pdf")
+        plotting.write_index_and_log(outDir, f"/fill{fill}_lumi", args=args)
+        plt.close()
 
-
-    ### Make plot for lumi vs pileup
-    plt.clf()
-    fig = plt.figure()
-    if do_ratio:
-        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
-        ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1])
-    else:
+    if "eff" in args.plots and "time" in args.plots:
+        ### Make plot for efficiency vs time
+        plt.clf()
+        fig = plt.figure()
+        
         ax1 = fig.add_subplot(111)
         
-    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
+        fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
+
+        ax1.set_xlabel(xlabel)
+        ax1.set_ylabel(ylabelEff)
+            
+        maxY = 0
+        minY = 1
+        for eff, name, col, mkr, ms in (
+            ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
+            ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
+            ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
+            ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
+        ):
+            
+            y = np.array([y.n for y in data_fill[eff].values])
+            yErr = np.array([y.s for y in data_fill[eff].values])
+            
+            # sort out zeros
+            mask = y>0
+            yErr = yErr[mask]
+            y = y[mask]
+
+            ax1.errorbar(x[mask], y, xerr=(xDown[mask], xUp[mask]), yerr=yErr, 
+                label=name,
+                marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
+                zorder=1)
+
+            # ax1.plot(x, y, label=name,
+            #     marker="o", linewidth=0, color=col, markersize=markersize)
+
+            # yMax = [y.n + y.s for y in data_fill[eff].values]
+            # yMin = [y.n - y.s for y in data_fill[eff].values]
+                        
+            maxY = max(maxY, max(y + yErr))
+            minY = min(minY, min(y - yErr))
+
+        leg = ax1.legend(loc="lower left", ncol=4)
         
-    ax1.set_xlabel("average pileup")
-    ax1.set_ylabel(ylabelLumi)
+        yRange = maxY - minY
+        ax1.set_ylim([minY-yRange*0.25, 1.01])
+        ax1.set_xlim([xMin, xMax])
+        ax1.set_xticks(xTicks)
 
-    hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
-    ax1.text(0.02, 0.97, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
+        ax1.set_xticks(xTicks)
 
-    y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
-    yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
+        hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
+        ax1.text(0.97, 0.6, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
-    yRef = data_fill['dLRec(/nb)'].values   
-    
-    ax1.plot(xPU, yRef, #xerr=(xDown, xUp), 
-        label="Reference luminosity", color="red", 
-        marker = "_",
-        linestyle='', zorder=0)
+        plt.savefig(outDir+f"/fill{fill}_eff.png")
+        plt.savefig(outDir+f"/fill{fill}_eff.pdf")
+        plotting.write_index_and_log(outDir, f"/fill{fill}_eff", args=args)
+        plt.close()    
 
-    ax1.errorbar(xPU, y, #xerr=(xDown, xUp), 
-        yerr=yErr, 
-        label="Z boson rate",
-        fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-        zorder=1)
 
-    leg = ax1.legend(loc="lower left", ncol=2)
+    if "pileup" in args.plots:
+        ### Make plot for lumi vs pileup
+        plt.clf()
+        fig = plt.figure()
+        if do_ratio:
+            gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
+            ax1 = plt.subplot(gs[0])
+            ax2 = plt.subplot(gs[1])
+        else:
+            ax1 = fig.add_subplot(111)
+            
+        fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
+            
+        ax1.set_xlabel("average pileup")
+        ax1.set_ylabel(ylabelLumi)
 
-    yMin = min(min(y),min(yRef))
-    yMax = max(max(y),max(yRef))
+        hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
+        ax1.text(0.2, 0.97, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
-    yRange = yMax - yMin 
-    ax1.set_ylim([yMin - yRange*0.5, yMax + yRange*0.2])
-    ax1.set_xlim([xMinPU, xMaxPU])
+        y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
+        yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
 
-    if do_ratio:
-        ax1.set(xticklabels=[])
-
-        ratios = []
-        for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
-            ratios.append(zlumi/lumi)
-
-        yRatio = np.array([yy.n for yy in ratios])
-        yRatioErr = np.array([y.s for y in ratios])
-    
-        ax2.set_xlabel("average pileup")
-        ax2.set_ylabel("Ratio")
+        yRef = data_fill['dLRec(/nb)'].values   
         
-        ax2.errorbar(xPU, yRatio, #xerr=(xDown, xUp), 
-            yerr=yRatioErr, 
-            label="Z rate measurement",
+        ax1.plot(xPU, yRef, #xerr=(xDown, xUp), 
+            label="Reference luminosity", color="red", 
+            marker = "_",
+            linestyle='', zorder=0)
+
+        ax1.errorbar(xPU, y, #xerr=(xDown, xUp), 
+            yerr=yErr, 
+            label="Z boson rate",
             fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
+
+        leg = ax1.legend(loc="lower left", ncol=2)
+
+        yMin = min(min(y),min(yRef))
+        yMax = max(max(y),max(yRef))
+
+        yRange = yMax - yMin 
+        ax1.set_ylim([yMin - yRange*0.5, yMax + yRange*0.2])
+        ax1.set_xlim([xMinPU, xMaxPU])
+
+        if do_ratio:
+            ax1.set(xticklabels=[])
+
+            ratios = []
+            for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
+                ratios.append(zlumi/lumi)
+
+            yRatio = np.array([yy.n for yy in ratios])
+            yRatioErr = np.array([y.s for y in ratios])
+        
+            ax2.set_xlabel("average pileup")
+            ax2.set_ylabel("Ratio")
             
-        ax2.plot(np.array([xMinPU, xMaxPU]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
+            ax2.errorbar(xPU, yRatio, #xerr=(xDown, xUp), 
+                yerr=yRatioErr, 
+                label="Z rate measurement",
+                fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+                zorder=1)
+                
+            ax2.plot(np.array([xMinPU, xMaxPU]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
 
-        ax2.set_ylim(args.rrange)
-        ax2.set_xlim([xMinPU, xMaxPU])
-        # ax2.set_xticks(xTicksPU)
+            if not args.noFit:
+                log.info("Make fit")
+                
+                func = linear
+                popt, pcov = curve_fit(func, xPU, yRatio, sigma=yRatioErr, absolute_sigma=True)
+                perr = np.sqrt(np.diag(pcov))
+                params = unc.correlated_values(popt, pcov)
+                log.info(params)     
 
-    # align y labels
-    ax1.yaxis.set_label_coords(-0.125, 0.5)
-    ax2.yaxis.set_label_coords(-0.138, 0.5)
+                f = lambda x: func(x, *params)
+                xMC = np.arange(0,100,0.5)
+                yMC = np.array([f(x).n for x in xMC])
+                yErrMC = np.array([f(x).s for x in xMC])
 
-    plt.savefig(outDir+f"/fill{fill}_lumi_pileup.{fmt}")
-    plotting.write_index_and_log(outDir, f"/fill{fill}_lumi_pileup", args=args)
-    plt.close()
+                nround = 3
+                slopes[fill] = params[0].n 
+                
+                ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  
+                    verticalalignment='top', 
+                    transform=ax2.transAxes,
+                    style='italic',
+                    fontsize=10,
+                    )    
+                ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
+
+            ax2.set_ylim(args.rrange)
+            ax2.set_xlim([xMinPU, xMaxPU])
+            # ax2.set_xticks(xTicksPU)
+
+        # align y labels
+        ax1.yaxis.set_label_coords(-0.125, 0.5)
+        ax2.yaxis.set_label_coords(-0.138, 0.5)
+
+        plt.savefig(outDir+f"/fill{fill}_lumi_pileup.png")
+        plt.savefig(outDir+f"/fill{fill}_lumi_pileup.pdf")
+        plotting.write_index_and_log(outDir, f"/fill{fill}_lumi_pileup", args=args)
+        plt.close()
   
-    
-    ## make plot eff vs. pileup
-    plt.clf()
-    fig = plt.figure()
+    if "eff" in args.plots and "pileup" in args.plots:
+        ## make plot eff vs. pileup
+        plt.clf()
+        fig = plt.figure()
 
-    ax1 = fig.add_subplot(111)
+        ax1 = fig.add_subplot(111)
 
-    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
-    
-    ax1.set_xlabel("average pileup")
-    ax1.set_ylabel(ylabelEff)
+        fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125, hspace=0.0)
         
-    maxY = 0
-    minY = 1
-    for eff, name, col, mkr, ms in (
-        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
-        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
-        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
-        ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
-    ):
+        ax1.set_xlabel("average pileup")
+        ax1.set_ylabel(ylabelEff)
+            
+        maxY = 0
+        minY = 1
+        for eff, name, col, mkr, ms in (
+            ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
+            ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
+            ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
+            ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
+        ):
+            
+            y = np.array([y.n for y in data_fill[eff].values])
+            yErr = np.array([y.s for y in data_fill[eff].values])
+
+            # sort out zeros
+            mask = y>0
+            yErr = yErr[mask]
+            y = y[mask]
+
+            # y = data_fill[eff].values
+
+            ax1.errorbar(xPU[mask], y, yerr=yErr, 
+                label=name,
+                marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
+                zorder=1)
+
+            # xerr=(xDown, xUp)
+            maxY = max(maxY, max(y + yErr))
+            minY = min(minY, min(y - yErr))
+
+        leg = ax1.legend(loc="lower left", ncol=4)
         
-        y = np.array([y.n for y in data_fill[eff].values])
-        yErr = np.array([y.s for y in data_fill[eff].values])
+        yRange = maxY - minY
+        ax1.set_ylim([minY-yRange*0.25, 1.01])
+        ax1.set_xlim([xMinPU, xMaxPU])
+        #ax1.set_xticks(xTicksPU)
 
-        # sort out zeros
-        mask = y>0
-        yErr = yErr[mask]
-        y = y[mask]
+        hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
+        ax1.text(0.97, 0.6, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
-        # y = data_fill[eff].values
+        plt.savefig(outDir+f"/fill{fill}_eff_pileup.png")
+        plt.savefig(outDir+f"/fill{fill}_eff_pileup.pdf")
+        plt.close()
 
-        ax1.errorbar(xPU[mask], y, yerr=yErr, 
-            label=name,
-            marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
-            zorder=1)
-
-        # xerr=(xDown, xUp)
-        maxY = max(maxY, max(y + yErr))
-        minY = min(minY, min(y - yErr))
-
-    leg = ax1.legend(loc="lower left", ncol=4)
-    
-    yRange = maxY - minY
-    ax1.set_ylim([minY-yRange*0.25, 1.01])
-    ax1.set_xlim([xMinPU, xMaxPU])
-    #ax1.set_xticks(xTicksPU)
-
-    hep.cms.label(label=args.label, loc=0, ax=ax1, data=True, year=args.year, rlabel=f"${round(yRef_lumi_per_fill[fill],1)}"+"\,\mathrm{pb}^{-1}$"+f", {args.year} (13TeV)")
-    ax1.text(0.97, 0.6, "\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
-
-    plt.savefig(outDir+f"/fill{fill}_eff_pileup.{fmt}")
-    plt.close()
-
-    plotting.write_index_and_log(outDir, f"/fill{fill}_eff_pileup", args=args)
+        plotting.write_index_and_log(outDir, f"/fill{fill}_eff_pileup", args=args)
 
 
-# Bar plot: fill x slopes
 if not args.noFit:
-    fig = plt.figure()
-    axs = fig.add_subplot(111)
+    log.info("Make plots of slopes")
 
-    plt.bar(list(slopes.keys()), slopes.values(), color='g')
-    axs.set_xlabel("Fills")
-    axs.set_ylabel("Slopes of fits")
-    plt.savefig(outDir+f"/slopes.{fmt}")
-    plt.close()
+    # Bar plot: fill x slopes
+    xlabel = "Slopes of fits [%]"
+    slopes = np.array([v for v in slopes.values()]) * 100 # convert in %
+    weights = np.array([v for v in yRef_lumi_per_fill.values()])/1000.
+
+    filename = "slopes"
+    if args.postfix:
+        filename += f"_{args.postfix}"
+
+    # fig = plt.figure()
+    # axs = fig.add_subplot(111)
+
+    # plt.bar(list(slopes.keys()), slopes.values(), color='g')
+    # axs.set_xlabel("Fills")
+    # axs.set_ylabel(xlabel)
+    # plt.savefig(outDir+f"/{filename}.png")
+    # plt.savefig(outDir+f"/{filename}.pdf")
+    # plt.close()
 
     # Histo for the fit slopes (for each fill)
+    mean = np.mean(slopes)
+    std = np.std(slopes)
+    xrange = (-std*1.5, std*1.5)
+
+    # include overflow and underflow in last and first bin
+    xx = np.array([min(max(v, xrange[0]), xrange[1]) for v in slopes])
 
     fig = plt.figure()
+    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125)
     axh = fig.add_subplot(111)
 
-    axh.set_xlabel("Slopes of fits")
+    axh.set_xlabel(xlabel)
     axh.set_ylabel("Number of fills")
-    axh.hist(slopes.values(), bins=len(slopes))
-    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-    plt.savefig(outDir+f"/hist_slopes.{fmt}")
+    axh.hist(xx, bins=50, range=xrange)
+    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+    hep.cms.label(label=args.label, loc=0, ax=axh, data=True, year=args.year, rlabel=f"${round(weights.sum(),1)}"+"\,\mathrm{fb}^{-1}$"+f", {args.year} (13TeV)")
+    axh.set_xlim(xrange)
+    plt.savefig(outDir+f"/hist_{filename}.png")
+    plt.savefig(outDir+f"/hist_{filename}.pdf")
     plt.close()
 
     # Weighted histo for the fit slopes (for each fill)
+    mean, std = utils.weighted_mean_std(slopes, weights)
+    xrange = (-std*1.5, std*1.5)
+
+    # include overflow and underflow in last and first bin
+    xx = np.array([min(max(v, xrange[0]), xrange[1]) for v in slopes])
 
     fig = plt.figure()
+    fig.subplots_adjust(left=0.15, right=0.98, top=0.92, bottom=0.125)
     axh = fig.add_subplot(111)
-
-    axh.set_xlabel("Slopes of fits")
-    axh.set_ylabel("Integrated luminosity [/pb]")
-    #log.info(slopes)
-    #log.info(yRef_lumi_per_fill)
-    axh.hist(slopes.values(), weights=yRef_lumi_per_fill.values(), bins=len(slopes))
-    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-    plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
+    axh.set_xlabel(xlabel)
+    axh.set_ylabel("Integrated luminosity [/fb]")
+    axh.hist(xx, weights=weights, bins=50, range=xrange)
+    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+    hep.cms.label(label=args.label, loc=0, ax=axh, data=True, year=args.year, rlabel=f"${round(weights.sum(),1)}"+"\,\mathrm{fb}^{-1}$"+f", {args.year} (13TeV)")
+    axh.set_xlim(xrange)
+    plt.savefig(outDir+f"/weighted_hist_{filename}.png")
+    plt.savefig(outDir+f"/weighted_hist_{filename}.pdf")
     plt.close()
 
