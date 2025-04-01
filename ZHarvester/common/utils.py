@@ -96,6 +96,13 @@ def load_input_csv(byLS_data):
     byLS_data = pd.read_csv(byLS_data, sep=',', low_memory=False,
         skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
         
+    ## Debugging
+    mask = byLS_data['#run:fill'].str.contains(':')
+    if not mask.all():
+        print(byLS_data[~mask])
+        raise ValueError("Some rows do not contain the expected ':' delimiter.")
+
+
     log.info("formatting csv file...")    # formatting the csv
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
     byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)   
@@ -165,19 +172,26 @@ def getFileName(directory, run):
     run : integer
         run number for the rootfile to load
     """
-
+    directory = os.path.normpath(directory)
     # check if run was processed already
-    eosFileList = glob.glob(directory + '/DQM_V0000*' + str(run) + '*.root')
+    #eosFileList = glob.glob(directory + '/DQM_V0000*' + str(run) + '*.root')
+    eosFileList = glob.glob(directory + '/DQM_V000*' + str(run) + '*.root')
+    #log.info(f"After initial glob in directory: {directory}:  {eosFileList}")
 
     # look one level deeper
     if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
-        eosFileList = glob.glob(f'{directory}/Muon*/000{str(run)[:-2]}xx/*{run}*.root')
-    if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/SingleMuon/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/Muon*/000{str(run)[:-2]}xx/*{run}*.root')
+    if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/*/*{run}*.root')
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(directory + '/output_Run' + str(run) + '*.root')  ## 2022 Data
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/**/DQM_V000*{run}*.root', recursive=True)
+    log.info(f"In directory: {directory}:  {eosFileList}")
     if len(eosFileList) == 0:
         log.warning(f"The file does not (yet) exist for run: {run}")
         return None
@@ -186,13 +200,23 @@ def getFileName(directory, run):
     elif len(eosFileList) > 1:
         # in 2023 the files were split into Muon0 and Muon1 for even and odd event numbers
         # in some cases, multiple versions are available we take the highest one
-
         fileList = []
 
         def get_lst(key="__Muon__"):
+            """
+            Filters files by key and selects the one with the highest version.
+            Optionally, prioritizes files containing 'PromptReco-v1'.
+            """
             lst = list(filter(lambda x: key in x, eosFileList))
+            # Additional filter for '27Jun2023' when the key is '__Muon__' or '__SingleMuon__'
+            if key in ["__Muon__", "__SingleMuon__"]:  
+                #lst = list(filter(lambda x: '27Jun2023' in x, lst))
+                lst = list(filter(lambda x: 'DQM_V0002' in x, lst))
+        
             if len(lst) == 0:
                 return []
+
+            # Optional step: Further filter files containing "PromptReco-v1" 
             lst_idx = list(map(lambda x: int(x.split("__DQMIO.root")[0].split("v")[-1]), lst))
 
             fileList.append(lst[np.argmax(lst_idx)])
@@ -205,6 +229,9 @@ def getFileName(directory, run):
         log.info(f"Mutliple ({len(fileList)}) files found for run {run}:")
         log.info(fileList)
         return fileList
+
+    log.info(f"In directory: {directory}:  {eosFileList}")
+
 
 # ------------------------------------------------------------------------------
 def load_histogram(
@@ -309,6 +336,12 @@ def load_histogram(
         bin_lo = (bins_new[0] - bins_x[0])/binWidth[0]
         bin_hi = (bins_new[-1] - bins_x[-1])/binWidth[0]
 
+
+        # Debugging
+        print(f"\n\n⚠️ Debug: Histogram {name}")
+        log.info(f"bin_lo: {bin_lo}, bin_hi: {bin_hi}, binWidth: {binWidth[0]} and binWidthNew: {binWidthNew} ")
+
+        # DEFAULT
         if not bin_lo.is_integer() or not bin_hi.is_integer() or bin_lo<0 or bin_hi>0:
             log.error("can not rebin to new range!")
             return None
@@ -511,7 +544,12 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=No
     """
     
     log.info("Writing overall CSV file")
+
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
+    #print(f"Found rate files: {rateFileList}")
+
+    if not rateFileList:
+        raise FileNotFoundError(f"No CSV files found in {outCSVDir} matching the pattern 'csvfile??????.csv'")
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
 
     if keys:
@@ -531,6 +569,10 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=No
     if writeByLS:
         log.info("Writing overall CSV file per LS")
         rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
+
+        if not rateFileList:
+            raise FileNotFoundError(f"No CSV files found in {outCSVDir} matching the pattern 'csvfile*_*.csv'")
+
         csvList = []
         # add measurement label to the csv list
         for m in rateFileList:
