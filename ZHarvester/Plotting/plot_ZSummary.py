@@ -9,8 +9,10 @@ import pandas as pd
 import uncertainties as unc
 import pdb
 from scipy.stats import norm    # for gauss function
+from matplotlib.patches import Patch
 
 import mplhep as hep
+hep.style.use(hep.style.CMS)
 
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
@@ -30,10 +32,13 @@ ROOT.gStyle.SetTitleX(.3)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
+parser.add_argument("-n","--newRates", nargs='+', type=str, default=None, help="Nominator csv file with z rates per measurement")
 parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
+parser.add_argument("--postfit", action="store_true", default=False, help="Scale by postfit values")
+
 args = parser.parse_args()
 
 outDir = args.saveDir
@@ -62,16 +67,17 @@ mpl.rcParams.update({
     "ytick.labelsize" : "medium",
 })
 
-# --- PHYSICS luminosity
 
-lumi_2016 = 35.9
-lumi_2017 = 38.2 # unprescaled 42.04
 
 # --- uncertainties on PHYSICS luminosity
 include_unc_PHYSICS = run2
-unc_2016 = np.sqrt(1.08**2 + 0.88**2 + (0.55-0.25)**2)/100.
-unc_2017 = np.sqrt(0.43**2 + 0.56**2 + (0.86-0.72)**2)/100.
-unc_2018 = np.sqrt(0.51**2 + 0.76**2 + (0.71-0.51)**2)/100.
+unc_2016 = 0.0141 # np.sqrt(1.08**2 + 0.88**2 + (0.55-0.25)**2)/100.
+unc_2017 = 0.0080 # np.sqrt(0.43**2 + 0.56**2 + (0.86-0.72)**2)/100.
+unc_2018 = 0.0102 # np.sqrt(0.51**2 + 0.76**2 + (0.71-0.51)**2)/100.
+
+unc_2016_highPU = 0.012 # 0.0141
+unc_2017_highPU = 0.0086 # 0.0080
+unc_2018_highPU = 0.0083 # 0.0102
 
 print("relative uncertainties attributed to PHYSICS: ")
 print("2016: "+str(unc_2016))
@@ -97,7 +103,15 @@ if args.xsec:
 
     print("apply prefire corrections - done")
 
-    xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
+    print(f"Lumi(2017H) = {data_xsec['recLumi'].sum()}")
+
+    nz = sum(data_xsec['recZCount'])
+    lumi = sum(data_xsec['recLumi'])
+    if args.postfit:
+        nz *= 1.00009373
+        lumi *= 1.00821199
+
+    xsec = nz/lumi
     normalize = False
 else:
     # normalize everything as no cross section is specified
@@ -112,8 +126,53 @@ else:
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
 
+print(f"Before: {data['recLumi'].sum()}")
+
+if args.newRates is not None:
+    data_new = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.newRates], ignore_index=True, sort=False)
+
+    common_rows = data.merge(data_new, on=['run', 'measurement'], suffixes=('_old', '_new'))
+
+    # mask = data_new[['run', 'measurement']].isin(data[['run', 'measurement']].to_dict(orient='list')).all(axis=1)
+
+    # data.loc[data['run'] > 315252, 'delLumi'] = data_new[mask]['delLumi']
+    # data.loc[data['run'] > 297020, 'recLumi'] = data_new[mask]['recLumi']
+    # data.loc[data['run'] > 297020, 'deadtime'] = data_new[mask]['deadtime']
+    # data.loc[data['run'] > 297020, 'pileUp'] = data_new[mask]['pileUp']
+
+    # data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'delLumi']
+
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'delLumi'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['delLumi'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'recLumi'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['recLumi'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'deadtime'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['deadtime'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'pileUp'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['pileUp'].dropna().values
+
+    print(f"After: {data['recLumi'].sum()}")
+
+
+# --- PHYSICS luminosity
+if args.postfit:
+    data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'recLumi'] = data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'recLumi'] * 0.99036267
+    data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'recLumi'] = data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'recLumi'] * 1.00686159
+    data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'recLumi'] = data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'recLumi'] * 0.9964506
+
+lumi_2016 = data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'recLumi'].sum()/1000.
+lumi_2017 = data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'recLumi'].sum()/1000.
+lumi_2018 = data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'recLumi'].sum()/1000.
+
+print(f"Lumi(2016) = {lumi_2016}")
+print(f"Lumi(2017) = {lumi_2017}")
+print(f"Lumi(2018) = {lumi_2018}")
+
+# --- Z counts
+
 if data['recZCount'].dtype==object:
     data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+if args.postfit:
+    data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'recZCount'] = data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'recZCount'] * 1.0000023
+    data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'recZCount'] = data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'recZCount'] * 1.00007705
+    data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'recZCount'] = data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'recZCount'] * 1.00005156
 
 # --->>> prefire corrections
 apply_muon_prefire(data)
@@ -122,6 +181,16 @@ apply_ECAL_prefire(data)
 # <<<---
 
 data['zLumi'] = data['recZCount'] / xsec
+
+zlumi_2016 = data.loc[((data['run'] > 272006) & (data['run'] < 294645)), 'zLumi'].sum()/1000.
+zlumi_2017 = data.loc[((data['run'] > 297045) & (data['run'] < 306463)), 'zLumi'].sum()/1000.
+zlumi_2018 = data.loc[((data['run'] > 315251) & (data['run'] < 325176)), 'zLumi'].sum()/1000.
+
+print(f"Lumi(2016) = {zlumi_2016}")
+print(f"Lumi(2017) = {zlumi_2017}")
+print(f"Lumi(2018) = {zlumi_2018}")
+
+
 
 data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
 data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
@@ -184,7 +253,9 @@ def make_hist(
     zLumi_name = 'zLumi',
     refLumi_name = 'recLumi',    
     sumN=50,    # make averages of sumN measurements
-    label="Z luminosity / Ref. luminosity",
+    # label="Z luminosity / Ref. luminosity",
+    # label="$\mathcal{L}^{Z}_{high\ PU} / \mathcal{L}_\mathrm{high\ PU}$",
+    label="$(N^{Z}_{high\ PU} / N^{Z}_\mathrm{low\ PU}) / (L_{high\ PU} / L_{low\ PU})$",
     saveas="zcount",
     year=None,
     legend='upper right',
@@ -302,30 +373,124 @@ def make_hist(
 
                 if year == 2016:
                     heights = np.array([unc_2016*2,])
-                    bottoms = np.array([1. - unc_2016,])
+                    # bottoms = np.array([1. - unc_2016,])
                 elif year == 2017:
                     heights = np.array([unc_2017*2,])
-                    bottoms = np.array([1. - unc_2017,])
+                    # bottoms = np.array([1. - unc_2017,])
                 elif year == 2018:
                     heights = np.array([unc_2018*2,])
-                    bottoms = np.array([1. - unc_2018,])
+                    # bottoms = np.array([1. - unc_2018,])
                 else:
                     starts = np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017])
-                    heights = np.array([unc_2016*2, unc_2017*2, unc_2018*2])
+                    lerr = np.array([unc_2016, unc_2017, unc_2018])
                     widths = np.array([abs(rangex[0])+lumi_2016, lumi_2017, rangex[1]-(lumi_2016+lumi_2017)])
-                    bottoms = np.array([1. - unc_2016, 1. - unc_2017, 1. - unc_2018])
+                    # bottoms = np.array([1. - unc_2016, 1. - unc_2017, 1. - unc_2018])
+                    for i, y in enumerate([2016, 2017, 2018]):
+                        x = starts[i]+widths[i]/2
+                        ax.text(x, rangey[1]-0.005, y, va='top', ha='center')
 
-                ax.plot([starts,starts], rangey, linestyle="--", color="black")
+                    heights_highPU = np.array([unc_2016_highPU, unc_2017_highPU, unc_2018_highPU])
+                    # bottoms_highPU = np.array([1. - unc_2016_highPU, 1. - unc_2017_highPU, 1. - unc_2018_highPU])
 
-                ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
-                    color="grey", alpha=0.4, hatch='/', zorder=4, #, alpha=0.6
-                    label="Ref. luminosity uncertainty")
+                # ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
+                #     color="grey", alpha=0.4, hatch='/', zorder=1, #, alpha=0.6
+                #     label="Ref. luminosity uncertainty")
 
-            ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Measurement")
+                # ax.stairs(
+                #     np.array(bottoms+heights/2.), np.append(starts, starts[-1]+widths[-1]), 
+                #     baseline=None, linestyle="-", linewidth=2, color="blue", 
+                #     zorder=3, 
+                #     label="Ref. luminosity uncertainty"
+                # )
+                zval = np.array([zlumi_2016/lumi_2016, zlumi_2017/lumi_2017, zlumi_2018/lumi_2018]) 
+                # zval = np.array(bottoms)
 
-            # ww = data['weightLumi'].values,
-            # rms = (sum((ww*yy)**2)/sum(ww))**0.5
-            # print(f"RMS = {rms}")
+                if not args.postfit:
+                    blue = "#5790fc"
+                    ax.stairs(
+                        zval*(1-lerr),
+                        np.append(starts, starts[-1]+widths[-1]), 
+                        baseline=None, linestyle="--", linewidth=2, color="#e76300", 
+                        zorder=3, 
+                        label="$\Delta (L_{high\ PU}/L_{low\ PU})$",
+                    )
+                    ax.stairs(
+                        zval*(1+lerr), 
+                        np.append(starts, starts[-1]+widths[-1]), 
+                        baseline=None, linestyle="--", linewidth=2, color="#e76300", 
+                        zorder=3, 
+                    )
+
+                    # ax.stairs(
+                    #     zval-heights_highPU/2., 
+                    #     np.append(starts, starts[-1]+widths[-1]), 
+                    #     baseline=None, linestyle=":", linewidth=2, color="#e42536", 
+                    #     zorder=3, 
+                    #     label="$\Delta L_{high\ PU}$",#"Ref. luminosity uncertainty"
+                    # )
+                    # ax.stairs(
+                    #     zval+heights_highPU/2., 
+                    #     np.append(starts, starts[-1]+widths[-1]), 
+                    #     baseline=None, linestyle=":", linewidth=2, color="#e42536", 
+                    #     zorder=3, 
+                    # )
+
+                # ax.stairs(
+                #     np.array([zlumi_2016/lumi_2016, zlumi_2017/lumi_2017, zlumi_2018/lumi_2018]), 
+                #     np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017, rangex[1]]), 
+                #     baseline=None, linestyle="-", linewidth=2, color='#e42536', 
+                #     zorder=3, label="Average")
+
+                if args.postfit:
+                    zerr = np.array([0.008148622083788956, 0.007153578874495117, 0.007134699102224342])
+                else:
+                    zerr = np.array([0.0072420508145137836, 0.004304985481973237, 0.004528631139759564])
+
+#         "value": np.array([35946.39738941, 38447.87459891, 59142.73452099, 203.4959755, 133740.5024848]),
+#         "hesse": np.array([292.9136076, 275.0399035, 421.96561489, 1.57895546, 942.60043282]),
+
+                if not args.postfit:
+                    purple = '#7a21dd'
+                    ax.stairs(
+                        zval* (1+zerr), 
+                        np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017, rangex[1]]), 
+                        baseline=None, linestyle=":", linewidth=2, color="#ffa90e", 
+                        zorder=3,
+                        label="$\Delta (N^{Z}_{high\ PU}/N^{Z}_{low\ PU})$"
+                        )
+                    ax.stairs(
+                        zval* (1-zerr), 
+                        np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017, rangex[1]]), 
+                        baseline=None, linestyle=":", linewidth=2, color="#ffa90e", 
+                        zorder=3)
+
+                
+                totalerr = np.sqrt(zerr**2 + lerr**2) if not args.postfit else zerr
+
+                orange = '#f89c20'
+                ax.stairs(
+                    zval* (1+totalerr), 
+                    np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017, rangex[1]]), 
+                    baseline=None, linestyle="-", linewidth=2, color="#bd1f01", 
+                    zorder=3,
+                    label="$\Delta Total$" if not args.postfit else "$\Delta L^{comb.}_{high\ PU}$"
+                    )
+                ax.stairs(
+                    zval* (1-totalerr), 
+                    np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017, rangex[1]]), 
+                    baseline=None, linestyle="-", linewidth=2, color="#bd1f01", 
+                    zorder=3)
+
+                ax.plot([starts,starts], (rangey[0]+0.04, rangey[1]), linestyle="--", color="black", zorder=3)            
+
+            ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', alpha=0.6, color='black',#'', 
+                label="Measurement", zorder=2)
+
+            ww = data['weightLumi'].values,
+            rms = (sum((ww*yy)**2)/sum(ww))**0.5
+            print(f"RMS = {rms}")
+
+            red = '#e42536'# 
 
             if suffix1 == "lumi" and plot_averages:
                 # average lumi bars at centered at half of the lumi in each bar
@@ -339,7 +504,11 @@ def make_hist(
                 xxNew = np.array([xxSum[0]/2., ])
                 xxNew = np.append(xxNew, xxSum[:-1]+(xxSum[1:] - xxSum[:-1])/2.)
 
-                ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
+                ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), label="Average", linewidth=2, linestyle="", ecolor="#3f90da", color="#3f90da", zorder=4)
+
+                # ax.errorbar(xxNew, yySum*1.005, xerr=(xxErr,xxErr), linestyle="dashed", ecolor='#e42536', color='#e42536', zorder=3)
+                # ax.errorbar(xxNew, yySum*0.995, xerr=(xxErr,xxErr), linestyle="dashed", ecolor='#e42536', color='#e42536', zorder=3)
+
 
             hep.cms.label(label=args.label, loc=0, ax=ax, data=True, year=year, lumi=lumi_sum)
 
@@ -350,7 +519,7 @@ def make_hist(
             ax.set_xlim(rangex)
             if suffix1 in ("lumi", "fill", "run"):
                 # plot horizontal line at 1
-                ax.plot(np.array(rangex), np.array([1.,1.]), 'k--', linewidth=1, zorder=3)
+                ax.plot(np.array(rangex), np.array([1.,1.]), 'k--', linewidth=2)
 
             if suffix1 in ("fill", ):
                 # plot vertical lines
@@ -408,15 +577,29 @@ def make_hist(
             plt.xticks(fontsize = labelsize)
             plt.yticks(fontsize = labelsize)
             if "lower" in legend:
-                ncol = 3
+                ncol = 3 if args.postfit else 4
             else:
                 ncol = 2
-            ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5], fontsize=textsize)#, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
 
-            ax.xaxis.set_label_coords(0.5, -0.1)
+            handles, labels = plt.gca().get_legend_handles_labels()
+            if not args.postfit:
+                p1 = Patch(color='none')
+                p2 = Patch(color='none')
+                p3 = Patch(color='none')
 
-            plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".png")
-            plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".pdf")
+                handles = [p1, p2, p3, *handles]
+                labels = ["", "", "", *labels]
+
+            ax.legend(handles=handles, labels=labels, loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5], fontsize=textsize, labelspacing=0.2, handlelength=1.0)#, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+
+            # ax.xaxis.set_label_coords(1, -0.1)
+            outname = "scatter_"+suffix+"_"+suffix1+"_"+saveas
+
+            if args.postfit:
+                outname += "_postfit"
+
+            plt.savefig(outDir+"/"+outname+".png")
+            plt.savefig(outDir+"/"+outname+".pdf")
             plt.close()
             plotting.write_index_and_log(outDir, "/scatter_"+suffix+"_"+suffix1+"_"+saveas, args=args)
 

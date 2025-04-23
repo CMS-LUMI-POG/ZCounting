@@ -70,8 +70,6 @@ if args.xnominal:
     cID = nominal['cID']
     cIO = nominal['cIO']
     cAcceptance = nominal['cAcceptance']
-    import pdb
-    pdb.set_trace()
 
     nominal['NsigHLT2'] = nominal['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
     nominal['NsigHLT1'] = nominal['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
@@ -166,15 +164,19 @@ data['recZCount_cIDDown'] = data['recZCount'] / data['cID'] * ((data['cID'] - 1)
 data['recZCount_cAcceptanceUp'] = data['recZCount'] / data['cAcceptance'] * ((data['cAcceptance'] - 1)*2.0 + 1)
 data['recZCount_cAcceptanceDown'] = data['recZCount'] / data['cAcceptance'] * ((data['cAcceptance'] - 1)*0.0 + 1)
 
-# number of selected Z bosons (before tracking efficiency corrections)
-if args.mode in [2,3]:
-    data['effTrk'] = data['effTrk'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data['selZCount'] = data['recZCount'] * data['effTrk']**2
+# # number of selected Z bosons (before tracking efficiency corrections)
+# if args.mode in [2,3]:
+#     data['effTrk'] = data['effTrk'].apply(lambda x: unc.ufloat_fromstr(x).n)
+#     data['selZCount'] = data['recZCount'] * data['effTrk']**2
 
-elif args.mode in [1,4]:
-    data['effGlo'] = data['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data['selZCount'] = data['recZCount'] * data['effGlo']**2
+# elif args.mode in [1,4]:
+#     data['effGlo'] = data['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
+#     data['selZCount'] = data['recZCount'] * data['effGlo']**2
 
+# number of observed Zs
+data['obsZCount'] = data['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n) \
+    + data['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n) \
+    + data['NsigIDFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
 
 # --->>> prefire corrections
@@ -200,10 +202,9 @@ for var in prefire_variations_Muon:
 
 
 print("apply ECAL prefire corrections")
-
 for var in prefire_variations_ECAL:
 
-    data['recZCount_prefECAL_{0}'.format(var)] = data['recZCount']
+    data[f'recZCount_prefECAL_{var}'] = data['recZCount']
 
     for lo, hi, era, func in (
         (272007, 278769, "2016preVFP", pexp),
@@ -229,22 +230,54 @@ for lo, hi, era in (
     (272007, 284045, "2016"),
     (272007, 278769, "2016preVFP"),
     (278769, 284045, "2016postVFP"),
-    (278769, 280919, "2016G"),
-    (280919, 284045, "2016H"),
+    # (278769, 280919, "2016G"),
+    # (280919, 284045, "2016H"),
     (297020, 306463, "2017"),
     (306828, 307083, "2017H"),   # 2017H
     (315252, 325274, "2018"),
-    (356100, 356616, "2022"),
+    # (356100, 356616, "2022"),
 ):
     loc = (data['run'] >= lo) & (data['run'] < hi)
 
     if len(loc) == 0:
         continue
 
+    print(" --- ")
+    print(era)
+
     info[era] = {}        
-    info[era]['selZCount'] = sum(data.loc[loc,'selZCount'])
+    info[era]['obsZCount'] = sum(data.loc[loc,'obsZCount'])
     info[era]['recZCount'] = sum(data.loc[loc,'recZCount'])
+
+    zcounts_prefMuon = sum(data.loc[loc, 'recZCount_prefMuon_nominal'])
+    if zcounts_prefMuon > 0:
+        corr = zcounts_prefMuon / sum(data.loc[loc,'recZCount'])
+        print(f"Apply prefire muon correction of {corr}")
+        info[era]['recZCount'] *= corr
+    
+    zcounts_prefECAL = sum(data.loc[loc, 'recZCount_prefECAL_nominal'])
+    if zcounts_prefECAL > 0:
+        corr = zcounts_prefECAL / sum(data.loc[loc,'recZCount'])
+        print(f"Apply prefire ECAL correction of {corr}")
+        info[era]['recZCount'] *= corr
+
+    info[era]['eff'] = info[era]['obsZCount'] / info[era]['recZCount']   
+
+    info[era]['recLumi'] = sum(data.loc[loc,'recLumi'])
+
+    # full stat uncertainty (including eff. part)
     info[era]['recZCount_err'] = np.sqrt(sum(data.loc[loc,'recZCount_err']**2))
+    # poisson stat unc.
+    info[era]['recZCount_stat'] = np.sqrt(sum(data.loc[loc,'recZCount']))
+    # eff stat unc.
+    info[era]['recZCount_eff_stat'] = np.sqrt(sum(data.loc[loc,'recZCount_err']**2) - sum(data.loc[loc,'obsZCount']))/sum(data.loc[loc,'recZCount'])
+
+    print(f"L(recorded) = {info[era]['recLumi']}")
+    print(f"nZ(obs) = {info[era]['obsZCount']}")
+    print(f"nZ(recorded) = {info[era]['recZCount']}")
+    print(f"eff(Z) = {info[era]['eff']}")
+    print(f"Delta eff(Z) = {info[era]['recZCount_eff_stat']*100} %")
+
     info[era]['recZCount_cHLTUp']   = sum(data.loc[loc,'recZCount_cHLTUp'])
     info[era]['recZCount_cHLTDown'] = sum(data.loc[loc,'recZCount_cHLTDown'])
     info[era]['recZCount_cIOUp']    = sum(data.loc[loc,'recZCount_cIOUp'])
@@ -259,9 +292,9 @@ for lo, hi, era in (
         info[era]['recZCount_altBkgFail']  = sum(data.loc[loc,'recZCount_altBkgFail'])
 
     for var in prefire_variations_Muon:
-        info[era]["prefMuon_"+var] = sum(data.loc[loc,'recZCount_prefMuon_{0}'.format(var)])
+        info[era]["prefMuon_"+var] = sum(data.loc[loc,f'recZCount_prefMuon_{var}'])
     for var in prefire_variations_ECAL:
-        info[era]["prefECAL_"+var] = sum(data.loc[loc,'recZCount_prefECAL_{0}'.format(var)])
+        info[era]["prefECAL_"+var] = sum(data.loc[loc,f'recZCount_prefECAL_{var}'])
 
 with open(outDir+"/info{0}.json".format(region),"w") as outfile:
     json.dump(info, outfile, indent=4, sort_keys=True)

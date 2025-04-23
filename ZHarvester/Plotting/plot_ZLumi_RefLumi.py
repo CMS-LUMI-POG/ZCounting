@@ -28,6 +28,7 @@ from scipy.optimize import curve_fit
 
 parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
+parser.add_argument("-n","--newRates", nargs='+', type=str, default=None, help="Nominator csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale. Or number for cross section in pb to be used")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
@@ -114,6 +115,18 @@ else:
 
 # --- z luminosity
 data = pd.read_csv(str(args.rates), sep=',',low_memory=False) #, skiprows=[1,2,3,4,5])
+
+if args.newRates is not None:
+    data_new = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.newRates], ignore_index=True, sort=False)
+
+    common_rows = data.merge(data_new, on=['run', 'measurement'], suffixes=('_old', '_new'))
+
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'delLumi'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['delLumi'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'recLumi'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['recLumi'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'deadtime'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['deadtime'].dropna().values
+    data.loc[data.set_index(['run', 'measurement']).index.isin(common_rows.set_index(['run', 'measurement']).index), 'pileUp'] = data_new.set_index(['run', 'measurement']).reindex(data.set_index(['run', 'measurement']).index)['pileUp'].dropna().values
+
+
 if args.fill != []:
     data = data.loc[data['fill'].isin(args.fill)]
 
@@ -155,14 +168,13 @@ data['dLRec(/nb)'] = data['recLumi'] / data['timewindow'] * 1000  # convert into
 for key in ('effHLT', 'effID', 'effGlo', 'effSta'):
     data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
 
-
 do_ratio=True ## activate the ratio plots 
 
 for fill, data_fill in data.groupby("fill"):
 
     if int(fill) < args.begin:
         continue
-    if int(fill) > args.end:
+    if args.end != -1 and int(fill) > args.end:
         continue
 
     log.info(f"Now at fill {fill}")
