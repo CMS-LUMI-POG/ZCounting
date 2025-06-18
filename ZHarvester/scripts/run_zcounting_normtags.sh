@@ -332,7 +332,7 @@ echo "Produce plots per fill"
 python3 Plotting/plot_ZLumi_RefLumi.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Fills --year ${YEAR} --xsec ${xsec} --rrange 0.9 1.1
 
 echo "Produce stability plots"
-#python3 Plotting/plot_stability.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Stability --year ${YEAR}
+python3 Plotting/plot_stability.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Stability --year ${YEAR}
 
 # echo "Produce linearity plots"
 # python3 Plotting/plot_linearity.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Linearity
