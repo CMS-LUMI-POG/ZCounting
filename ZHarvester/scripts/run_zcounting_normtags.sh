@@ -19,7 +19,7 @@ shift
 shift
 shift
 
-allowed_normtags=("BRIL", "hfet" "dt", "hfoc", "pcc", "pltzero", "bcm1futca", "bcm1f")
+allowed_normtags=("BRIL" "hfet" "dt" "hfoc" "pcc" "pltzero" "bcm1futca" "bcm1f")
 
 if [[ $etaRegion == "Barrel" ]]; then 
     etaMin=0.0
@@ -82,19 +82,15 @@ echo $CERT
 echo 'Set brilcalc environment'
 source /cvmfs/cms-bril.cern.ch/cms-lumi-pog/brilws-docker/brilws-env
 
-# Define normtagPath if applicable
-if [[ " ${allowed_normtags[@]} " =~ " ${normtag} " ]]; then
-    normtagPath="/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_${normtag}.json"
-    if [[ ! -e $normtagPath ]]; then 
-        echo "Error: Normtag file $normtagPath does not exist"
-        exit 1
-    fi
-    echo "The following ${normtagPath} was used"
-    normtagOption="--normtag ${normtagPath}"
-else
-    normtagOption="--normtag ${normtag}"
+# Define how to pass the normtag: via --type (for detector names) or --normtag (for specific normtag)
+#if [[ " ${allowed_normtags[@]} " =~ " ${normtag} " ]]; then
+if [[ " ${allowed_normtags[*]} " == *" ${normtag} "* ]]; then
+    echo "Using detector type: ${normtag}"
+    normtagOption="--type ${normtag}"
+    else
+        echo "Using specific normtag argument: ${normtag}"
+        normtagOption="--normtag ${normtag}"
 fi
-
 
 
 lumimaskbase="cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions${YEAR:2:4}/"
@@ -131,7 +127,7 @@ curl -k --cert $CERT -X GET $lumimask | awk -F "<a href=\"" '{ print $2} ' | whi
             echo "Make brilcalc from ${lumimaskName} to ${brilcalcFilePath}"
             cp $lumimaskFilePath ./$lumimaskName
 
-        # definition of brilcalc alias found via `alias brilcalc`: 
+        #definition of brilcalc alias found via `alias brilcalc`: 
         if [[ "$jsonType" == "DCSOnly_TkPx" ]]; then
             singularity -s exec --env PYTHONPATH=/home/bril/.local/lib/python3.10/site-packages /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-cloud/brilws-docker:latest brilcalc lumi --datatag online -b "STABLE BEAMS" --byls -u /fb -i $lumimaskName -o $brilcalcFileName
         else
