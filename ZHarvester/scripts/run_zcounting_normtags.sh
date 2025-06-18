@@ -19,7 +19,7 @@ shift
 shift
 shift
 
-allowed_normtags=("BRIL" "hfet" "dt", "hfoc", "pcc", "pltzero", "bcm1futca", "bcm1f")
+allowed_normtags=("BRIL", "hfet" "dt", "hfoc", "pcc", "pltzero", "bcm1futca", "bcm1f")
 
 if [[ $etaRegion == "Barrel" ]]; then 
     etaMin=0.0
@@ -59,7 +59,7 @@ PDDIR="$COREDIR$PDDIR/"
 RESOURCES_OUTPUT="/eos/home-c/cmszcont/data/zcounting/"
 HISTOGRAM_OUTPUT="${RESOURCES_OUTPUT}/DQM_Histograms/"
 LUMIMASK_OUTPUT="${RESOURCES_OUTPUT}/Lumimasks/"
-BRILCALC_OUTPUT="${RESOURCES_OUTPUT}/Brilcalc_byLsCSV/${normtag}/${jsonType}" 
+BRILCALC_OUTPUT="${RESOURCES_OUTPUT}/Brilcalc_byLsCSV/${YEAR}/${normtag}/${jsonType}"
 
 FITS_OUTPUT="${WEBDIR}/RunsAndFits/"
 CSVS_OUTPUT="$FITS_OUTPUT/csvFiles"
