@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import ROOT
 import pandas as pd
 import glob
@@ -8,6 +9,7 @@ import pdb
 import datetime
 import numpy as np
 from roofit.utils import load_makros
+
 
 from common import utils, logging, parsing
 
@@ -158,7 +160,6 @@ if __name__ == '__main__':
 
     log = logging.setup_logger(__file__, args.verbose)
 
-
     ########################################
     # link to resouces
     year = utils.get_year_by_run(args.beginRun)
@@ -194,10 +195,42 @@ if __name__ == '__main__':
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
 
 
-    byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
-    eosDir  = args.input
+    byLsCSV = byLsCSV if args.byLsCSV == "default" else args.byLsCSV
+    
+    
+    # Validate the input
+    if os.path.isdir(byLsCSV):
+        log.warning(f"The provided path {byLsCSV} is a directory. Searching for *.csv files inside it.")
+        byLsCSV = os.path.join(byLsCSV, "*.csv")
 
-    measurement      = args.measurement
+
+    #if os.path.isdir(byLsCSV):
+        # if a directory is given take the golden json if present, otherwise the dcs json
+        #files = [f.split("/")[-1] for f in glob.glob(f"{byLsCSV}/*")]
+        #files = [f for f in files if "_era" not in f]
+        #byLsCSVs = [f for f in files if args.beginRun >= int([p for p in f.split("_") if p.isdigit()][0]) and args.endRun <= int([p for p in f.split("_") if p.isdigit()][1])]
+        #log.info(f"Entering the byLSCSVs NEW") 
+        #byLsCSVs = []
+       # for f in files:
+            # Extract numeric parts from the filename
+       #     numeric_parts = [p for p in f.split("_") if p.isdigit()]
+            # Ensure there are enough numeric parts to prevent index errors
+       #     if len(numeric_parts) >= 2:
+       #         begin_run = int(numeric_parts[0])
+       #         end_run = int(numeric_parts[1])
+       #         if args.beginRun >= begin_run and args.endRun <= end_run:
+       #             byLsCSVs.append(f)
+#
+
+       # if len(byLsCSVs) > 0:
+       #     log.info(f"byLS file {byLsCSVs[0]} found")
+       #     byLsCSV=f"{byLsCSV}/{byLsCSVs[0]}"
+       # else:
+       #     raise RuntimeError("No byLS file found, exit")
+
+    eosDir = args.input
+
+    measurement = args.measurement
 
     log.info("----------------------------------")
     log.info("Use eosDir:              {0}".format(eosDir))
@@ -269,13 +302,20 @@ if __name__ == '__main__':
 
     #etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
+    byLS_data = utils.load_input_csv(byLS_filename)
+    if byLS_data is None:
+        raise RuntimeError("No runs found in byLS csv file, exit")
+    byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
+
+    if len(byLS_data) <= 0:
+        #raise RuntimeError(f"No runs within {int(args.beginRun)} and {int(args.endRun)} in byLS csv, exit")
+        #15 May 2025, Tatiana Selezneva. Fixing Mergedcsvfile_perMeasurement.csv creation
+        log.warning(f"No byLS entries for runs {int(args.beginRun)}–{int(args.endRun)}; skipping")
+        sys.exit(0)
+        
     if not args.collect:        
         load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
 
-
-    byLS_data = utils.load_input_csv(byLS_filename)
-    byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
-    
     #####################################   
     recLumi = 0
     results = []
@@ -292,6 +332,7 @@ if __name__ == '__main__':
         log.info(f"Now at run {run}")
         fileName = utils.getFileName(eosDir,run)
         if fileName is None:
+            log.info("No file found, continue with next run")
             continue
         log.info(f"Found file `{fileName}`")
 

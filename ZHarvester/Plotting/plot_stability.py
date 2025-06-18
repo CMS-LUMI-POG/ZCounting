@@ -10,6 +10,9 @@ import pdb
 from scipy.stats import norm    # for gauss function
 import matplotlib.ticker as ticker
 
+import mplhep as hep
+hep.style.use(hep.style.ROOT)
+
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
@@ -33,6 +36,11 @@ if not os.path.isdir(outDir):
 # --- settings
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
+if args.year > 2018:
+    energy=13.6
+else:
+    energy=13
+
 # --- if averages should be plotted
 plot_averages = True
 
@@ -44,10 +52,8 @@ data = utils.load_result(args.rates)
 
 data['weight'] = data['recLumi']
 
-# sort out runs with low stat
-data = data.loc[data['recLumi'] > 10]
-
-#pdb.set_trace()
+# # sort out runs with low stat
+# data = data.loc[data['recLumi'] > 10]
 
 def make_hist(
     df,
@@ -62,17 +68,16 @@ def make_hist(
     color_hist="green", 
     color_scatter="blue"
 ):
+    print("0")
+
     if df[parameter].dtype==object:
         df[parameter] = df[parameter].apply(lambda x: unc.ufloat_fromstr(x).n)
-
-    if "2022" in title:
-        lefttitle = "$13.6\,\mathrm{TeV}$"
-    else:
-        lefttitle = "$13\,\mathrm{TeV}$"
-
+    
+    lefttitle = "${"+str(energy)+"\,\mathrm{TeV}$"
     if title:
         lefttitle += " $(\mathrm{"+title+"})$"
 
+    lefttitle=""
     if run_range:
         data = df.loc[(df["run"] >= run_range[0]) & (df["run"] <= run_range[1])]
         if len(df) ==0:
@@ -104,7 +109,7 @@ def make_hist(
     rangex = (mean - width, mean + width)
     nBins = 60
 
-    plt.rcParams['font.size'] = '17.5'
+    # plt.rcParams['font.size'] = '17.5'
 
     # --- make histogram
     # include overflow and underflow in last and first bin
@@ -112,7 +117,7 @@ def make_hist(
     for weighted in (False, True):
         plt.clf()
         fig = plt.figure()
-        fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125)
+        fig.subplots_adjust(left=0.15, right=0.99, top=0.95, bottom=0.125)
         ax = fig.add_subplot(111)
 
         if weighted:
@@ -124,14 +129,17 @@ def make_hist(
         
         if True:
             # # plot a gaussian function with mean and std from distribution for comparison
-
             hist_integral = sum(nEntries * (bins[1:] - bins[:-1]))
             x = np.linspace(rangex[0], rangex[1], 100)
             plt.plot(x, hist_integral*norm.pdf(x,mean,std), color="red", linestyle="solid")
-
             
         ax.set_xlabel(label)
-        ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+        hep.cms.label(
+                ax=ax, 
+                # fontsize=20, 
+                label=args.label, 
+                data=True, 
+                rlabel=f"{round(data['weight'].sum()/1000,1)}"+"$\,\mathrm{fb}^{-1},$"+f"{args.year} ({energy}\, TeV)")
         ax.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)), 
             verticalalignment='top', horizontalalignment="right", transform=ax.transAxes)
 
@@ -146,7 +154,7 @@ def make_hist(
         plt.savefig(f"{outputname}.pdf")
         plt.close()
 
-    plt.rcParams['font.size'] = '16'
+    plt.rcParams['font.size'] = '17.5'
 
     # --- make scatter
     for xx, xxSum, xlabel, suffix1 in (
@@ -164,7 +172,7 @@ def make_hist(
             plt.clf()
             fig = plt.figure(figsize=(10.0,4.0))
             ax = fig.add_subplot(111)
-            fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
+            fig.subplots_adjust(left=0.1, right=0.99, top=0.9, bottom=0.15)
 
             ax.scatter(xx, yy, s=data['weight'].values, marker='.', color=color_scatter, zorder=1, label="Measurement")
 
@@ -186,10 +194,17 @@ def make_hist(
 
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor=color_hist, color=color_hist, zorder=2, label="Average")
 
-            ax.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+            #hep.cms.label(ax=ax, fontsize=20, label=args.label, year=args.year, data=True)
+            #hep.cms.label(ax=ax, fontsize=20, label=args.label, data=True, rlabel=f"{round(data['weight'].sum()/1000,1)}"+"$\,\mathrm{fb}^{-1},$"+f"{args.year} ({energy} TeV)")
+            hep.cms.label(
+                    ax=ax, 
+                    #fontsize=20, 
+                    label=args.label, 
+                    data=True, 
+                    rlabel=f"{round(data['weight'].sum()/1000,1)}"+"$\,\mathrm{fb}^{-1},$"+f"{args.year} ({energy} TeV)")
 
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
+            ax.set_xlabel(xlabel)#, fontsize=20)
+            ax.set_ylabel(ylabel)#, fontsize=20)
 
             if rangey == "auto":
                 mean = np.mean(yy)
@@ -260,15 +275,20 @@ def make_hist(
                 xfmt = mdates.DateFormatter('%Y-%m-%d')
                 ax.xaxis.set_major_formatter(xfmt)
 
-            plt.xticks(fontsize = labelsize)
-            plt.yticks(fontsize = labelsize)
+            #plt.xticks(fontsize = labelsize)
+            #plt.yticks(fontsize = labelsize)
 
             if "lower" in legend:
                 ncol = 3
             else:
                 ncol = 2
 
-            ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5])
+            ax.legend(
+                    loc=legend, 
+                    #fontsize=20,
+                    ncol=ncol, 
+                    markerscale=3, 
+                    scatteryoffsets=[0.5])
             ax.xaxis.set_label_coords(0.5, -0.1)
 
             outputname = f"{outDir}/scatter_{parameter}_{suffix}_{suffix1}_{saveas}"
@@ -279,35 +299,41 @@ def make_hist(
             plt.close()
 
 
-# # plot efficiencies
-# for p in ["HLT", "ID", "Glo", "Sta"]:
+# plot efficiencies
+for p in ["HLT", ]:#"ID", "Glo", "Sta"]:
 
-#     param = "eff"+p
+    param = "eff"+p
 
-#     label = "$\epsilon$ ("+p+")"
+    label = "$\epsilon$ ("+p+")"
 
-#     color_hist="orange"
-#     color_scatter="red"
+    color_hist="orange"
+    color_scatter="red"
 
-#     make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right", color_hist=color_hist, color_scatter=color_scatter)
-#     make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021), color_hist=color_hist, color_scatter=color_scatter)
+    if p=="HLT":
+        rangey=(0.846,0.934)
+    else:
+        rangey="auto"
 
+    make_hist(data, param, rangey=rangey, label=label, saveas="zcount", title=f"{args.year}", legend="lower right", color_hist=color_hist, color_scatter=color_scatter)
+    # make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021), color_hist=color_hist, color_scatter=color_scatter)
 
-# # plot signal model parameters
-# for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
-#     for p in ["mean", "sigma"]:
+exit()
 
-#         log.info(f"Start param = {p+c}")
-#         param = p+c
+# plot signal model parameters
+for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
+    for p in ["mean", "sigma"]:
 
-#         if param.startswith("mean"):
-#             label = "$\mu$("+param.replace("mean","")+")    "
-#         elif param.startswith("sigma"):
-#             label = "$\sigma$("+param.replace("sigma","")+")    "
+        log.info(f"Start param = {p+c}")
+        param = p+c
 
-#         make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right")
-#         make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
-#         make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
+        if param.startswith("mean"):
+            label = "$\mu$("+param.replace("mean","")+")    "
+        elif param.startswith("sigma"):
+            label = "$\sigma$("+param.replace("sigma","")+")    "
+
+        make_hist(data, param, label=label, saveas="zcount", title=f"{args.year}",  legend="lower right")
+        # make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
+        # make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
 
 # plot background fractions
 for p in ["fracGloPass","fracGloFail","fracHLT1","fracHLT2","fracIDFail","fracStaPass","fracStaFail"]:
@@ -326,4 +352,4 @@ for p in ["fracGloPass","fracGloFail","fracHLT1","fracHLT2","fracIDFail","fracSt
     data[p] = data[p].replace(np.nan,0)
 
     label = p
-    make_hist(data, p, label=label, saveas="2022_zcount", title="2022", legend="lower right")	
+    make_hist(data, p, label=label, saveas="zcount", title=f"{args.year}", legend="lower right")	

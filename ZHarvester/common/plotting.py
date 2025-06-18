@@ -1,19 +1,20 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-def set_matplotlib_style():
+def set_matplotlib_style(use_latex=False):
 
     textsize = 16
     markersize = 4.0
     labelsize =  12.5
 
-    plt.rcParams.update({
-        "text.usetex": True,
-        "font.family": "serif",
-        "font.serif": ["Palatino",],
-        "font.size": textsize,
-        'text.latex.preamble': [r"""\usepackage{bm}"""]
-    })
+    if use_latex:
+        plt.rcParams.update({
+            "text.usetex": True,
+            "font.family": "serif",
+            "font.serif": ["Palatino",],
+            "font.size": textsize,
+            'text.latex.preamble': [r"""\usepackage{bm}"""]
+        })
 
     mpl.rcParams.update({
         "legend.fontsize" : "medium",

@@ -9,6 +9,11 @@ import matplotlib.ticker as ticker
 import os, sys
 import pdb
 
+import math
+
+import mplhep as hep
+hep.style.use(hep.style.ROOT)
+
 sys.path.append(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
@@ -23,14 +28,17 @@ from common import parsing, plotting, logging
 from ZUtils.python.utils import linear, pol2
 from scipy.optimize import curve_fit
 
+#mpl.rcParams["text.usetex"] = False
 
 parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale. Or number for cross section in pb to be used")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
+#parser.add_argument('--year', default=2024, type=int, help='Year of analysis (e.g., 2024)')
 parser.add_argument("--rrange", nargs=2,  type=float, default=[0.961,1.039], help="Specify range in ratio plot")
 parser.add_argument("--noFit", action="store_true", default=False, help="Don't do a fit")
+parser.add_argument("--online", action="store_true", default=False, help="Run with online luminosity")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
@@ -45,20 +53,29 @@ secPerLS=float(23.3)
 fmt = "png"
 
 # plotting options
-colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style(False)
 
-lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 xlabel = "LHC runtime [h]"
-ylabelLumi = "Inst. luminosity [nb$^{-1}$s$^{-1}$]"
+if args.online:
+    ylabelLumi = "Inst. online luminosity [nb$^{-1}$s$^{-1}$]"
+else:
+    ylabelLumi = "Inst. ref. luminosity [nb$^{-1}$s$^{-1}$]"
+
 ylabelEff = "Efficiency"
 
 # Store the slops of the fits
 slopes = {}   
+slopes_pileup = {}   
 
 # Store the lumi of each fill
 yRef_lumi_per_fill = {}
 
  
+if args.year > 2018:
+    energy=13.6
+else:
+    energy=13
+
 ########## Data Acquisition ##########
 
 if args.refLumi != "":
@@ -153,12 +170,7 @@ do_ratio=True ## activate the ratio plots
 for fill, data_fill in data.groupby("fill"):
     log.info(f"Now at fill {fill}")
 
-    if int(fill) >= 8496:
-        energystr = "$13.6\,\mathrm{TeV} (2023)$"
-    elif int(fill) >= 8000:
-        energystr = "$13.6\,\mathrm{TeV} (2022)$"
-    else:
-        energystr = "$13\,\mathrm{TeV} (2017)$"
+    energystr = f"${energy}\,\mathrm{{TeV}} ({args.year})$"
     
     if len(data_fill) == 1:
         log.info("Only one measurement, next fill ")
@@ -180,6 +192,9 @@ for fill, data_fill in data.groupby("fill"):
             ref_fill_lumi.append(ref_fill.loc[(ref_fill['time'] >= tDown) & (ref_fill['time'] < tUp)]['recorded(/nb)'].sum() / ((tUp - tDown) *24 * 3600) )
         
         yRefExt = np.array(ref_fill_lumi)
+
+    yRef = data_fill['dLRec(/nb)'].values
+    yRef_lumi_per_fill[fill] = yRef.sum()
 
     x = data_fill['time'].values
     xUp = data_fill['timeUp'].values
@@ -228,7 +243,7 @@ for fill, data_fill in data.groupby("fill"):
     
     ax1 = fig.add_subplot(111)
     
-    fig.subplots_adjust(left=0.15, right=0.97, top=0.97, bottom=0.125, hspace=0.0)
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.125, hspace=0.0)
 
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelEff)
@@ -267,18 +282,18 @@ for fill, data_fill in data.groupby("fill"):
     leg = ax1.legend(loc="lower left", ncol=4)
     
     yRange = maxY - minY
-    ax1.set_ylim([minY-yRange*0.25, 1.01])
+    ax1.set_ylim([minY-yRange*0.25, 1.02])
     ax1.set_xlim([xMin, xMax])
     ax1.set_xticks(xTicks)
 
     ax1.set_xticks(xTicks)
 
-    ax1.text(0.02, 0.6, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), verticalalignment='top', transform=ax1.transAxes)
+    hep.cms.label(ax=ax1, label=args.label, data=True, rlabel=f"Fill {fill} "+f"({args.year}, {energy} TeV)")
 
     plt.savefig(outDir+f"/fill{fill}_eff.{fmt}")
     plt.close()    
 
-    ### Make plot for lumi vs time
+    ### Make plot for lumi vs times
     plt.clf()
     fig = plt.figure()
     if do_ratio:
@@ -288,12 +303,10 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ax1 = fig.add_subplot(111)
         
-    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.95, top=0.95, bottom=0.125)
-        
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.125, hspace=0.0)
+
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelLumi)
-    ax1.text(0.97, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
-
         
     if args.xsec == "":
         # normalize Z luminosity to reference luminosity    
@@ -307,12 +320,12 @@ for fill, data_fill in data.groupby("fill"):
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
 
-    yRef = data_fill['dLRec(/nb)'].values
-
-    yRef_lumi_per_fill[fill] = yRef.sum()
-
+    if args.online:
+        lumi_label = "Online luminosity"
+    else:
+        lumi_label = "Ref. luminosity"
     
-    ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Ref. luminosity", color="red", 
+    ax1.errorbar(x, yRef, xerr=(xDown, xUp), label=lumi_label, color="red", 
         linestyle='', zorder=0)
 
     if extLumi:
@@ -346,7 +359,7 @@ for fill, data_fill in data.groupby("fill"):
         yRatioErr = np.array([y.s for y in ratios])
     
         ax2.set_xlabel(xlabel)
-        ax2.set_ylabel("Ratio")
+        ax2.set_ylabel("Z Rate / Luminosity")#"Ratio")
         
         ax2.errorbar(x, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
             label="Z rate measurement",
@@ -355,36 +368,43 @@ for fill, data_fill in data.groupby("fill"):
             
         ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
        
-        if not args.noFit:
-            log.info("Make fit")
+        # if not args.noFit:
+        #     log.info("Make fit")
             
-            func = linear
-            popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
-            perr = np.sqrt(np.diag(pcov))
-            params = unc.correlated_values(popt, pcov)
-            log.info(params)     
+        #     func = linear
+        #     popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
+        #     perr = np.sqrt(np.diag(pcov))
+        #     params = unc.correlated_values(popt, pcov)
+        #     log.info(params)     
 
-            f = lambda x: func(x, *params)
-            xMC = np.arange(0,100,0.5)
-            yMC = np.array([f(x).n for x in xMC])
-            yErrMC = np.array([f(x).s for x in xMC])
+        #     f = lambda x: func(x, *params)
+        #     xMC = np.arange(0,100,0.5)
+        #     yMC = np.array([f(x).n for x in xMC])
+        #     yErrMC = np.array([f(x).s for x in xMC])
 
-            nround = 3
-            slopes[fill] = params[0].n 
+        #     nround = 3
+        #     slopes[fill] = params[0].n 
             
-            ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
-            ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
+        #     # ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
+        #     ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
 
         ax2.set_ylim(args.rrange)
         ax2.set_xlim([xMin, xMax])
         ax2.set_xticks(xTicks)
-        leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
+        # leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
 
 
 
     # align y labels
-    ax1.yaxis.set_label_coords(-0.12, 0.5)
-    ax2.yaxis.set_label_coords(-0.12, 0.5)
+    ax1.yaxis.set_label_coords(-0.12, 1.0)
+    ax2.yaxis.set_label_coords(-0.12, 1.0)
+
+    lumi = round(yRef_lumi_per_fill[fill], 1)
+    if lumi>100:
+        lumi = int(lumi) 
+    # ax1.text(0.96, 0.94, f"$\mathcal{{L}}^\mathrm{'online' if args.online else 'ref'}_\mathrm{{int.}}={lumi}"+"\,\mathrm{pb}^{-1}$", 
+    #     transform=ax1.transAxes, verticalalignment="top", horizontalalignment="right")
+    hep.cms.label(ax=ax1, label=args.label, data=True, rlabel=f"Fill {fill} "+f"({args.year}, {energy} TeV)")
 
     plt.savefig(outDir+f"/fill{fill}_lumi.{fmt}")
     plt.close()
@@ -400,12 +420,10 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ax1 = fig.add_subplot(111)
         
-    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.95, top=0.95, bottom=0.125)
-        
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.125, hspace=0.0)
+
     ax1.set_xlabel("average pileup")
     ax1.set_ylabel(ylabelLumi)
-
-    ax1.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), horizontalalignment='left', verticalalignment='top', transform=ax1.transAxes)
 
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
@@ -453,17 +471,47 @@ for fill, data_fill in data.groupby("fill"):
             
         ax2.plot(np.array([xMinPU, xMaxPU]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
 
+        if not args.noFit:
+            log.info("Make fit")
+            
+            func = linear
+            popt, pcov = curve_fit(func, xPU, yRatio, sigma=yRatioErr, absolute_sigma=True)
+            perr = np.sqrt(np.diag(pcov))
+            params = unc.correlated_values(popt, pcov)
+
+            if np.isfinite(pcov).all():
+                log.info(params)     
+
+                f = lambda x: func(x, *params)
+                xMC = np.arange(0,100,0.5)
+                yMC = np.array([f(x).n for x in xMC])
+                yErrMC = np.array([f(x).s for x in xMC])
+
+                slopes_pileup[fill] = params[0].n 
+
+                nround = 3                
+                # ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
+                ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
+            else:
+                log.info("Fit did not converge")                 
+
         ax2.set_ylim(args.rrange)
         ax2.set_xlim([xMinPU, xMaxPU])
         # ax2.set_xticks(xTicksPU)
 
     # align y labels
-    ax1.yaxis.set_label_coords(-0.12, 0.5)
+    ax1.yaxis.set_label_coords(-0.12, 1.0)
     ax2.yaxis.set_label_coords(-0.12, 0.5)
+
+    lumi = round(yRef_lumi_per_fill[fill], 1)
+    if lumi>100:
+        lumi = int(lumi) 
+    ax1.text(0.96, 0.94, f"$\mathcal{{L}}^{{{'online' if args.online else 'ref'}}}_\mathrm{{int.}}={lumi}"+"\,\mathrm{pb}^{-1}$", 
+        transform=ax1.transAxes, verticalalignment="top", horizontalalignment="right")
+    hep.cms.label(ax=ax1, label=args.label, data=True, rlabel=f"Fill {fill} "+f"({args.year}, {energy} TeV)")
 
     plt.savefig(outDir+f"/fill{fill}_lumi_pileup.{fmt}")
     plt.close()
-  
     
     ## make plot eff vs. pileup
     plt.clf()
@@ -471,7 +519,7 @@ for fill, data_fill in data.groupby("fill"):
 
     ax1 = fig.add_subplot(111)
 
-    fig.subplots_adjust(left=0.15, right=0.97, top=0.97, bottom=0.125, hspace=0.0)
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.125, hspace=0.0)
     
     ax1.set_xlabel("average pileup")
     ax1.set_ylabel(ylabelEff)
@@ -511,49 +559,71 @@ for fill, data_fill in data.groupby("fill"):
     ax1.set_xlim([xMinPU, xMaxPU])
     #ax1.set_xticks(xTicksPU)
 
-
-    ax1.text(0.02, 0.6, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), verticalalignment='top', transform=ax1.transAxes)
-
-
+    hep.cms.label(ax=ax1, label=args.label, data=True, rlabel=f"Fill {fill} "+f"({args.year}, {energy} TeV)")
 
     plt.savefig(outDir+f"/fill{fill}_eff_pileup.{fmt}")
     plt.close()
- 
+
+round_to = lambda x, n=2: x if x == 0 else round(x, -int(math.floor(math.log10(abs(x)))) + (n - 1))
+
 # Bar plot: fill x slopes
 if not args.noFit:
-    fig = plt.figure()
-    axs = fig.add_subplot(111)
+    for s, suffix in [(slopes, "time"), (slopes_pileup, "pileup")]:
+        if len(s)<=0:
+            continue
 
-    plt.bar(list(slopes.keys()), slopes.values(), color='g')
-    axs.set_xlabel("Fills")
-    axs.set_ylabel("Slopes of fits")
-    plt.savefig(outDir+f"/slopes.{fmt}")
-    plt.close()
+        val = np.array([v for v in s.values()])
+        lumis = np.array([yRef_lumi_per_fill[k] for k in s.keys()])
 
-    # Histo for the fit slopes (for each fill)
+        mean = np.mean(list(val))
+        std = np.std(list(val))
 
-    fig = plt.figure()
-    axh = fig.add_subplot(111)
+        log.info(f"Sample of slopes with mean {mean} and std {std}")
 
-    axh.set_xlabel("Slopes of fits")
-    axh.set_ylabel("Number of fills")
-    axh.hist(slopes.values(), bins=len(slopes))
-    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-    plt.savefig(outDir+f"/hist_slopes.{fmt}")
-    plt.close()
+        weighted_mean = np.sum(lumis * val) / np.sum(lumis)
+        variance = np.sum(lumis * (val - weighted_mean)**2) / np.sum(lumis)
+        weighted_std = np.sqrt(variance)
 
-    # Weighted histo for the fit slopes (for each fill)
+        log.info(f"Weighted sample of slopes with mean {weighted_mean} and std {weighted_std}")
 
-    fig = plt.figure()
-    axh = fig.add_subplot(111)
+        nbins = 20
+        for xrange in ([-0.02, 0.02], [-0.002, 0.002]):
+            # include outliers in first and last bin
+            val[val < xrange[0]] = xrange[0]
+            val[val > xrange[1]] = xrange[1]
 
-    axh.set_xlabel("Slopes of fits")
-    axh.set_ylabel("Integrated luminosity [/pb]")
-    #log.info(slopes)
-    #log.info(yRef_lumi_per_fill)
-    axh.hist(slopes.values(), weights=yRef_lumi_per_fill.values(), bins=len(slopes))
-    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-    plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
-    plt.close()
+            xlabel = "Slopes of fits"
+            # Histo for the fit slopes (for each fill) weighted and unweighted
+            for weighted, mu, sigma in ((True, weighted_mean, weighted_std), (False, mean, std)):
+                ylabel = "Integrated luminosity [/pb]" if weighted else "Number of fills"
+
+                fig = plt.figure()
+                axh = fig.add_subplot(111)
+                fig.subplots_adjust(left=0.15, right=0.97, top=0.95, bottom=0.125, hspace=0.0)
+                axh.set_xlabel(xlabel)
+                axh.set_ylabel(ylabel)
+                if weighted:
+                    axh.hist(val, weights=lumis, bins=nbins, range=xrange)
+                else:
+                    axh.hist(val, bins=nbins, range=xrange)
+
+                axh.text(0.97, 0.97, 
+                    f"$\\mu$ = {round_to(mu)} \n $\\sigma$ = {round_to(sigma)}",
+                    verticalalignment='top', horizontalalignment="right", transform=axh.transAxes
+                )
+
+                axh.set_xlim(xrange)
+                outname = "hist_slopes"
+                if suffix is not None:
+                    outname += f"_{suffix}"
+                if weighted:
+                    outname += "_weighted"
+
+                outname += "_" + str(xrange[1]).replace(".","p")
+
+                plt.savefig(outDir+f"/{outname}.{fmt}")
+                plt.close()
+
+        
 
 

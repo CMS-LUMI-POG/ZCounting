@@ -9,12 +9,19 @@ import uncertainties as unc
 import pdb
 from scipy.stats import norm    # for gauss function
 import matplotlib.ticker as ticker
+import warnings
+
+import mplhep as hep
+hep.style.use(hep.style.ROOT)
 
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
 sys.path.append(os.getcwd())
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+
+warnings.filterwarnings("ignore", message="Setuptools is replacing distutils")
+
 
 from common.utils import to_DateTime
 from common.corrections import apply_muon_prefire, apply_ECAL_prefire
@@ -25,6 +32,8 @@ parser = parsing.parser_plot()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
 parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
+#parser.add_argument("--year", type=int, help="Year of analysis (e.g., 2024)")
+parser.add_argument("--saveas", type=str, help="Custom name for the output plots.")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
@@ -33,6 +42,7 @@ if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 # --- settings
+#colors, textsize, labelsize, markersize = plotting.set_matplotlib_style(False)
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
 
@@ -155,18 +165,11 @@ def make_hist(
     sumN=50,    # make averages of sumN measurements
     label="Z rate / Ref. luminosity",
     saveas="zcount",
-    title=None,
+    year=2024,
+    energy=13.6,
     legend='upper right',
     rangey=[0.89,1.11]
 ):
-    if "2022" in title or "2023" in title or "Run 3" in title:
-        lefttitle = "$13.6\,\mathrm{TeV}$"
-    else:
-        lefttitle = "$13\,\mathrm{TeV}$"
-
-    if title:
-        lefttitle += " $(\mathrm{"+title+"})$"
-
     saveas = str(sumN) + "_" + saveas
 
     if run_range:
@@ -211,7 +214,7 @@ def make_hist(
     for weighted in (False, True):
         plt.clf()
         fig = plt.figure()
-        fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125)
+        fig.subplots_adjust(left=0.1, right=0.99, top=0.95, bottom=0.1)
         ax = fig.add_subplot(111)
 
         if weighted:
@@ -230,9 +233,10 @@ def make_hist(
 
             
         ax.set_xlabel(label)
-        ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+        # ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
         ax.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)), 
             verticalalignment='top', horizontalalignment="right", transform=ax.transAxes)
+        hep.cms.label(ax=ax, fontsize=20, label=args.label, data=True, rlabel=f"{round(data[refLumi_name].sum()/1000,1)}"+"$\,\mathrm{fb}^{-1},$"+f"{year} ({energy} TeV)")
 
         ax.set_xlim(range)
 
@@ -264,7 +268,7 @@ def make_hist(
             plt.clf()
             fig = plt.figure(figsize=(10.0,4.0))
             ax = fig.add_subplot(111)
-            fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
+            fig.subplots_adjust(left=0.1, right=0.99, top=0.9, bottom=0.15)
 
             # plot uncertinty bar attributed to PHYSICS luminosity
             if suffix1 in ("lumi", ) and include_unc_PHYSICS:
@@ -272,23 +276,23 @@ def make_hist(
                 starts = np.array([rangex[0],])
                 widths = np.array([abs(rangex[1] - rangex[0]),])
 
-                if title and "2016" in title:
-                    heights = np.array([unc_2016*2,])
-                    bottoms = np.array([1. - unc_2016,])
-                elif title and "2017" in title:
-                    heights = np.array([unc_2017*2,])
-                    bottoms = np.array([1. - unc_2017,])
-                elif title and "2018" in title:
-                    heights = np.array([unc_2018*2,])
-                    bottoms = np.array([1. - unc_2018,])
-                elif title and "Run2" in title:
-                    starts = np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017])
-                    heights = np.array([unc_2016*2, unc_2017*2, unc_2018*2])
-                    widths = np.array([abs(rangex[0])+lumi_2016, lumi_2017, rangex[1]-(lumi_2016+lumi_2017)])
-                    bottoms = np.array([1. - unc_2016, 1. - unc_2017, 1. - unc_2018])
-                else:
-                    heights=None
-                    bottoms=None
+                heights=None
+                bottoms=None
+
+                # if title and "2016" in title:
+                #     heights = np.array([unc_2016*2,])
+                #     bottoms = np.array([1. - unc_2016,])
+                # elif title and "2017" in title:
+                #     heights = np.array([unc_2017*2,])
+                #     bottoms = np.array([1. - unc_2017,])
+                # elif title and "2018" in title:
+                #     heights = np.array([unc_2018*2,])
+                #     bottoms = np.array([1. - unc_2018,])
+                # elif title and "Run2" in title:
+                #     starts = np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017])
+                #     heights = np.array([unc_2016*2, unc_2017*2, unc_2018*2])
+                #     widths = np.array([abs(rangex[0])+lumi_2016, lumi_2017, rangex[1]-(lumi_2016+lumi_2017)])
+                #     bottoms = np.array([1. - unc_2016, 1. - unc_2017, 1. - unc_2018])
                 
                 if heights != None and bottoms!=None:
                     ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
@@ -315,7 +319,7 @@ def make_hist(
 
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
 
-            ax.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+            hep.cms.label(ax=ax, fontsize=20, label=args.label, data=True, rlabel=f"{round(data[refLumi_name].sum()/1000,1)}"+"$\,\mathrm{fb}^{-1},$"+f"{year} ({energy} TeV)")
 
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
@@ -336,14 +340,13 @@ def make_hist(
                 ax.text(6269, rangey[0], "Start leveling", rotation='vertical', verticalalignment='bottom',
                     fontsize=textsize*0.6, horizontalalignment='left', color="blue")
                 # ax.plot(np.array([6070,6070]), np.array(rangey), 'r-', linewidth=1, zorder=3)
-                # ax.plot(np.array([6170,6170]), np.array(rangey), 'r-', linewidth=1, zorder=3)
+                # ax.plot(np.array([6170,6170]), np.array(rangey), 'r-', linewidth=1, zorder=3)\
 
                 def get_fill(x):
                     if len(data.loc[data['run'] > x]) * len(data.loc[data['run'] < x]) > 0:
                         return data.loc[data['run'] > x]['fill'].values[0]
                     else:
-                        None 
-
+                        None
                 # trigger versions
                 ax.plot(np.array([get_fill(296070),get_fill(296070)]), np.array(rangey), 'r--', linewidth=1, zorder=3)
                 ax.plot(np.array([get_fill(297099),get_fill(297099)]), np.array(rangey), 'r--', linewidth=1, zorder=3)
@@ -385,13 +388,32 @@ def make_hist(
                 ncol = 3
             else:
                 ncol = 2
+            
+            if  suffix1 in ("run", ):
 
+                # plot vertical lines
+                vertical_lines_x = [379387,382400,383100,381300,384918,385250,386685]
+                vertical_lines_x_names = ["VdM","0.99","0.98","VdM expectation","0.97","0.96","0.955"]
+                #for x in vertical_lines_x:
+                #    ax.plot(np.array([x, x]), np.array(rangey), 'r-', linewidth=1, zorder=3)
+                #    ax.text(x + 2, rangey[1], f"{x}", rotation='vertical', verticalalignment='top')
+                for x, name in zip(vertical_lines_x, vertical_lines_x_names):
+                    ax.plot(np.array([x, x]), np.array(rangey), 'r-', linewidth=1, zorder=3)
+                    ax.text(x + 2, rangey[1], name, rotation='vertical', verticalalignment='top')
             ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5])
             ax.xaxis.set_label_coords(0.5, -0.1)
 
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".png")
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".pdf")
             plt.close()
+            
+# Define the saveas
+saveas = args.saveas if args.saveas else f"{args.year}_zcount"
+
+
+# Produce the histos and scatters
+make_hist(data, saveas=saveas, year=args.year, energy=13.6,  legend="lower right", rangey=[0.80,1.20])
+
 
 # make_hist(data, run_range=(297046,306462),
 #     # label="$\mathcal{L}_\mathrm{Z} / \mathcal{L}_\mathrm{C}$", 
@@ -420,11 +442,16 @@ def make_hist(
 # 
 # make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
 
-make_hist(data, saveas="Run3_zcount", title="Run 3",  legend="lower right")
 
-make_hist(data, saveas="2022_zcount", title="2022",  legend="lower right", run_range=(355065, 362760))
-make_hist(data, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
-make_hist(data, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
+#make_hist(data, saveas="Run3_zcount", year=2024, energy=13.6,  legend="lower right")
+#make_hist(data, saveas="Run3_zcount", year="Run 3", energy=13.6,  legend="lower right")
 
-make_hist(data, saveas="2023_zcount", title="2023",  legend="lower right", run_range=(366403, 367475))
+#make_hist(data, saveas="2022_zcount", year=2022, energy=13.6, legend="lower right", run_range=(355065, 362760))
+#make_hist(data, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
+#make_hist(data, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
 
+#make_hist(data, saveas="2023_zcount", year=2023, energy=13.6, legend="lower right", run_range=(366403, 367475))
+
+#make_hist(data, saveas="2023_zcount", year="2023", energy=13.6,  legend="lower right", rangey=[0.80,1.20])
+
+#make_hist(data, label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2022")#,rangey=[0.85,1.15])

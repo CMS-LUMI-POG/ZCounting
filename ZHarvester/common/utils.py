@@ -97,6 +97,8 @@ def load_input_csv(byLS_data):
         skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
         
     log.info("formatting csv file...")    # formatting the csv
+    if len(byLS_data) == 0:
+        return None
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
     byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)   
 
@@ -184,17 +186,15 @@ def getFileName(directory, run):
     elif len(eosFileList) == 1:
         return eosFileList[0]   
     elif len(eosFileList) > 1:
-        # in 2023 the files were split into Muon0 and Muon1 for even and odd event numbers
-        # in some cases, multiple versions are available we take the highest one
-
+        # in 2023 the files were split into Muon0 and Muon1 for even and odd event numbers, take both
         fileList = []
-
         def get_lst(key="__Muon__"):
             lst = list(filter(lambda x: key in x, eosFileList))
             if len(lst) == 0:
                 return []
-            lst_idx = list(map(lambda x: int(x.split("__DQMIO.root")[0].split("v")[-1]), lst))
-
+            # in some cases, multiple versions (small v and capital V) are available we take the highest one with preference on small v
+            lst_idx = np.array(list(map(lambda x: 1000*int(x.split("__DQMIO.root")[0].split("v")[-1]), lst)))
+            lst_idx += np.array(list(map(lambda x: int(x.split("__DQMIO.root")[0].split("DQM_V0")[1].split("_")[0]), lst)))
             fileList.append(lst[np.argmax(lst_idx)])
         
         get_lst("__Muon0__") 
@@ -266,7 +266,7 @@ def load_histogram(
             else:
                 hist_summed += hist
         return hist_summed
-        
+    
     with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
 
         h_ = th_.to_numpy()
@@ -542,7 +542,7 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=No
         df_merged = pd.concat(csvList, ignore_index=True, sort=False)
 
         # df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
-
+        print(f"Create the output file at {outCSVDir}")
         with open(outCSVDir + '/' + outName + '_perLS.csv', 'w') as file:
             df_merged.to_csv(file, index=False)
 
