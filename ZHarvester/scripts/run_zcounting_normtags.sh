@@ -128,11 +128,11 @@ curl -k --cert $CERT -X GET $lumimask | awk -F "<a href=\"" '{ print $2} ' | whi
             cp $lumimaskFilePath ./$lumimaskName
 
         #definition of brilcalc alias found via `alias brilcalc`: 
-        if [[ "$jsonType" == "DCSOnly_TkPx" ]]; then
-            singularity -s exec --env PYTHONPATH=/home/bril/.local/lib/python3.10/site-packages /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-cloud/brilws-docker:latest brilcalc lumi --datatag online -b "STABLE BEAMS" --byls -u /fb -i $lumimaskName -o $brilcalcFileName
-        else
-            singularity -s exec --env PYTHONPATH=/home/bril/.local/lib/python3.10/site-packages /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-cloud/brilws-docker:latest brilcalc lumi $normtagOption -b "STABLE BEAMS" --byls -u /fb -i "$lumimaskName" -o "$brilcalcFileName"
-        fi
+        #if [[ "$jsonType" == "DCSOnly_TkPx" ]]; then
+        #    singularity -s exec --env PYTHONPATH=/home/bril/.local/lib/python3.10/site-packages /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-cloud/brilws-docker:latest brilcalc lumi --datatag online -b "STABLE BEAMS" --byls -u /fb -i $lumimaskName -o $brilcalcFileName
+        #else
+        singularity -s exec --env PYTHONPATH=/home/bril/.local/lib/python3.10/site-packages /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-cloud/brilws-docker:latest brilcalc lumi $normtagOption -b "STABLE BEAMS" --byls -u /fb -i "$lumimaskName" -o "$brilcalcFileName"
+        #fi
 
 	    mv $brilcalcFileName $brilcalcFilePath
 	    rm $lumimaskName
