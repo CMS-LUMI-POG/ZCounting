@@ -309,6 +309,25 @@ do
     --byLsCSV $BRILCALC_OUTPUT -o $FITS_OUTPUT --etaMin $etaMin --etaCut $etaMax 
 done
 
+#Fixing Mergedcsvfile_perMeasurement.csv creation
+# ———  ———
+CSVS_OUTPUT="$FITS_OUTPUT/csvFiles"
+out="$CSVS_OUTPUT/Mergedcsvfile_perMeasurement.csv"
+shopt -s nullglob
+files=($CSVS_OUTPUT/csvfile*.csv)
+if (( ${#files[@]} > 0 )); then
+  echo "Merging ${#files[@]} per‐run CSVs into $out"
+  head -n1 "${files[0]}" > "$out"
+  for f in "${files[@]}"; do
+    tail -n+2 "$f" >> "$out"
+  done
+else
+  echo "No per‐run CSVs found; merged CSV stays empty"
+fi
+shopt -u nullglob
+# ————————————————————————————————————————————————
+
+
 #############################################
 ## Run ZCounting fits
 #############################################
