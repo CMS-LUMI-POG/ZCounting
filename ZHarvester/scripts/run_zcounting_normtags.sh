@@ -13,13 +13,16 @@ jsonType=$1   # can be Golden or DCSOnly_TkPx
 etaRegion=$3  # can be Barrel or Inclusive
 normtag=$4    # can be BRIL, HFET, etc.
 
+normtag="${normtag//$'\r'/}"
+normtag="${normtag//[[:space:]]/}"
+
 # need to shift arguments to not confuse other scripts
 shift
 shift
 shift
 shift
 
-allowed_normtags=("BRIL" "hfet" "dt" "hfoc" "pcc" "pltzero" "bcm1futca" "bcm1f")
+allowed_normtags=("hfet" "dt" "hfoc" "pxl" "pltzero" "bcm1futca" "bcm1f")
 
 if [[ $etaRegion == "Barrel" ]]; then 
     etaMin=0.0
@@ -84,12 +87,15 @@ source /cvmfs/cms-bril.cern.ch/cms-lumi-pog/brilws-docker/brilws-env
 
 # Define how to pass the normtag: via --type (for detector names) or --normtag (for specific normtag)
 #if [[ " ${allowed_normtags[@]} " =~ " ${normtag} " ]]; then
-if [[ " ${allowed_normtags[*]} " == *" ${normtag} "* ]]; then
+if [[ "${normtag^^}" == "BRIL" ]]; then
+    echo "Using BRIL online lumi"
+    normtagOption="--datatag online"
+elif [[ " ${allowed_normtags[*]} " == *" ${normtag} "* ]]; then
     echo "Using detector type: ${normtag}"
     normtagOption="--type ${normtag}"
-    else
-        echo "Using specific normtag argument: ${normtag}"
-        normtagOption="--normtag ${normtag}"
+else
+    echo "Using specific normtag argument: ${normtag}"
+    normtagOption="--normtag ${normtag}"
 fi
 
 
