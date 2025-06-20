@@ -331,7 +331,7 @@ shopt -u nullglob
 #############################################
 
 echo "Produce plots per fill"
-python3 Plotting/plot_ZLumi_RefLumi.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Fills --year ${YEAR} --xsec ${xsec} --rrange 0.9 1.1
+python3 Plotting/plot_ZLumi_RefLumi.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Fills --year ${YEAR} --xsec ${xsec} --rrange 0.9 1.1 --normtag ${normtag}
 
 echo "Produce stability plots"
 python3 Plotting/plot_stability.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Stability --year ${YEAR}
@@ -342,7 +342,7 @@ python3 Plotting/plot_stability.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasuremen
 # TODO: plot_ZSummary.py
 
 echo "Produce stability plots"
-python3 Plotting/plot_ZSummary.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Summary --year ${YEAR} --xsec ${xsec}
+python3 Plotting/plot_ZSummary.py -r ${CSVS_OUTPUT}/Mergedcsvfile_perMeasurement.csv -o ${WEBDIR}/Summary --year ${YEAR} --xsec ${xsec} --normtag ${normtag}
 
 
 export PATH="${PATH}:${HOME}/php-plots/bin"

@@ -39,12 +39,15 @@ parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="spec
 parser.add_argument("--rrange", nargs=2,  type=float, default=[0.961,1.039], help="Specify range in ratio plot")
 parser.add_argument("--noFit", action="store_true", default=False, help="Don't do a fit")
 parser.add_argument("--online", action="store_true", default=False, help="Run with online luminosity")
+parser.add_argument("--normtag", type=str, help="Optional normtag label for plot annotation")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
+
+normtag_label = args.normtag if args.normtag else "ref."
 
 ########## Settings ##########
 
@@ -59,7 +62,7 @@ xlabel = "LHC runtime [h]"
 if args.online:
     ylabelLumi = "Inst. online luminosity [nb$^{-1}$s$^{-1}$]"
 else:
-    ylabelLumi = "Inst. ref. luminosity [nb$^{-1}$s$^{-1}$]"
+    ylabelLumi = "Inst. {} luminosity [nb$^{-1}$s$^{-1}$]".format(normtag_label)
 
 ylabelEff = "Efficiency"
 
@@ -323,7 +326,7 @@ for fill, data_fill in data.groupby("fill"):
     if args.online:
         lumi_label = "Online luminosity"
     else:
-        lumi_label = "Ref. luminosity"
+        lumi_label = "{} luminosity".format(normtag_label)
     
     ax1.errorbar(x, yRef, xerr=(xDown, xUp), label=lumi_label, color="red", 
         linestyle='', zorder=0)
@@ -359,7 +362,7 @@ for fill, data_fill in data.groupby("fill"):
         yRatioErr = np.array([y.s for y in ratios])
     
         ax2.set_xlabel(xlabel)
-        ax2.set_ylabel("Z Rate / Luminosity")#"Ratio")
+        ax2.set_ylabel("Z Rate / {} luminosity".format(normtag_label))#"Ratio")
         
         ax2.errorbar(x, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
             label="Z rate measurement",
@@ -431,7 +434,7 @@ for fill, data_fill in data.groupby("fill"):
     yRef = data_fill['dLRec(/nb)'].values   
     
     ax1.plot(xPU, yRef, #xerr=(xDown, xUp), 
-        label="Reference luminosity", color="red", 
+        label="{} luminosity".format(normtag_label), color="red", 
         marker = "_",
         linestyle='', zorder=0)
 

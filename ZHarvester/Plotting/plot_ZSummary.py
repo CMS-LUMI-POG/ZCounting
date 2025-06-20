@@ -34,6 +34,7 @@ parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 #parser.add_argument("--year", type=int, help="Year of analysis (e.g., 2024)")
 parser.add_argument("--saveas", type=str, help="Custom name for the output plots.")
+parser.add_argument("--normtag", type=str, help="Optional normtag label for plot annotation")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
@@ -147,7 +148,9 @@ data['weightLumi'] = data['recLumi']
 
 log.info("analyze {0} fb^-1 of data (reference lumi)".format(data['weightLumi'].sum()/1000.))
 log.info("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
-log.info("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
+normtag_label = args.normtag if args.normtag else "ref."
+log.info("ratio: z lumi/ {0} lumi = {1}".format(normtag_label, data['zLumi'].sum()/data['weightLumi'].sum()))
+
 
 log.info("Outliers:")
 data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.1]
@@ -163,7 +166,7 @@ def make_hist(
     zLumi_name = 'zLumi',
     refLumi_name = 'recLumi',    
     sumN=50,    # make averages of sumN measurements
-    label="Z rate / Ref. luminosity",
+    label = f"Z rate / {args.normtag if args.normtag else 'Ref.'} luminosity",
     saveas="zcount",
     year=2024,
     energy=13.6,
@@ -297,7 +300,7 @@ def make_hist(
                 if heights != None and bottoms!=None:
                     ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
                         color="grey", alpha=0.4, hatch='/', zorder=4, #, alpha=0.6
-                        label="Ref. luminosity uncertainty")
+                        label=f"{args.normtag if args.normtag else 'Ref.'} luminosity uncertainty")
 
             ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Measurement")
 
