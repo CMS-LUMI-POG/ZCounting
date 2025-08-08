@@ -300,7 +300,8 @@ def make_hist(
 
 
 # plot efficiencies
-for p in ["HLT", ]:#"ID", "Glo", "Sta"]:
+#for p in ["HLT", ]:#"ID", "Glo", "Sta"]:
+for p in ["HLT","ID","Glo","Sta"]:
 
     param = "eff"+p
 
