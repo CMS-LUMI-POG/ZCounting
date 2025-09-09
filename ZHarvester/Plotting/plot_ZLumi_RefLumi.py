@@ -60,9 +60,9 @@ colors, textsize, labelsize, markersize = plotting.set_matplotlib_style(False)
 
 xlabel = "LHC runtime [h]"
 if args.online:
-    ylabelLumi = "Inst. online luminosity [nb$^{-1}$s$^{-1}$]"
+    ylabelLumi = "Inst. online luminosity [nb$^{{-1}}$s$^{{-1}}$]"
 else:
-    ylabelLumi = "Inst. {} luminosity [nb$^{-1}$s$^{-1}$]".format(normtag_label)
+    ylabelLumi = "Inst. {} luminosity [nb$^{{-1}}$s$^{{-1}}$]".format(normtag_label)
 
 ylabelEff = "Efficiency"
 
