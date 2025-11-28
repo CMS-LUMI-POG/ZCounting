@@ -62,6 +62,15 @@ treename = "zcounting/tree"
 filenames = [f+":"+treename for f in args.input]
 dirOut = args.output
 
+# New DEBUGs
+#print(f"[INFO] Input files: {args.input}")
+print(f"[INFO] Output directory: {dirOut}")
+print(f"[INFO] Mode: {mode}")
+print(f"[INFO] Will process runs: {args.runs if args.runs else 'Auto-detected from files'}")
+
+
+
+
 if not os.path.isdir(dirOut):
     print(f"create output directory {dirOut}")
     os.mkdir(dirOut)
@@ -95,6 +104,8 @@ if runs == None:
     runs = set()
     for batch in uproot.iterate(filenames, filter_name="runNumber", library="np"):
         runs.update(set(batch["runNumber"]))
+        # New DEBUGs
+        print(f"[INFO] Found runs: {sorted(runs)}")
 
 # loop over all runs
 print(f"Loop over all runs")
@@ -261,14 +272,19 @@ for run in runs:
                 else:
                     hists[histname] = hist
 
+        print("[DEBUG] Producing histograms for category: 2HLT")
         produce("2HLT", hlt_pass)
+        print("[DEBUG] Producing histograms for category: 1HLT")
         produce("1HLT", hlt_pass, hlt_fail) 
+        print("[DEBUG] Producing histograms for category: SIT_fail")
         produce("SIT_fail", hlt_pass, sel_fail) 
 
         if mode == "cmssw":
             produce("Glo_fail", hlt_pass, glo_fail) 
             produce("Glo_fail", hlt_pass, trks)
         elif mode == "LUM-21-001":
+            # New DEBUGs
+            print("[DEBUG] Producing histograms for mode: LUM-21-001")
             produce("Sta_pass", hlt_pass, sta_pass) 
             produce("Sta_fail", hlt_pass, trks)
 
@@ -281,6 +297,7 @@ for run in runs:
 
     # write the histograms out
     for name, hist in hists.items():
+        print(f"[DEBUG] Writing histogram: {name}")
         output[name] = hist
 
 
