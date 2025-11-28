@@ -183,6 +183,8 @@ def getFileName(directory, run):
     if len(eosFileList) == 0:
         eosFileList = glob.glob(directory + '/output_Run' + str(run) + '*.root')  ## For 2022 Data
     if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/**/DQM_V000*{run}*.root', recursive=True)
+    if len(eosFileList) == 0:
         log.warning(f"The file does not (yet) exist for run: {run}")
         return None
     elif len(eosFileList) == 1:
